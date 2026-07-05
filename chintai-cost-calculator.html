@@ -254,7 +254,19 @@
       min-height: 44px;
       color: var(--ink);
       font-size: 13px;
-      padding: 0 2px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      transition: background .16s ease, border-color .16s ease, color .16s ease;
+    }
+
+    .toggle.is-on,
+    .toggle:has(input:checked) {
+      color: #0f4f4a;
+      border-color: rgba(15, 118, 110, .42);
+      background: #ecfdf5;
+      font-weight: 800;
     }
 
     .toggle input {
@@ -598,11 +610,11 @@
       { id: "fireInsurance", label: "火災保険料", type: "amountOnly", value: "" }
     ];
     const monthlyDefaults = [
-      { label: "口座振替事務手数料", value: "", includeInAdvance: false, includeInGuarantee: false },
-      { label: "月次保証料", value: "", includeInAdvance: false, includeInGuarantee: false },
-      { label: "町会費", value: "", includeInAdvance: true, includeInGuarantee: true },
-      { label: "火災保険料", value: "", includeInAdvance: true, includeInGuarantee: true },
-      { label: "24時間サポート", value: "", includeInAdvance: true, includeInGuarantee: true }
+      { label: "口座振替事務手数料", value: "", mode: "amount", includeInAdvance: false, includeInGuarantee: false },
+      { label: "月次保証料", value: "1", mode: "percent", includeInAdvance: false, includeInGuarantee: false },
+      { label: "町会費", value: "", mode: "amount", includeInAdvance: true, includeInGuarantee: true },
+      { label: "火災保険料", value: "", mode: "amount", includeInAdvance: true, includeInGuarantee: true },
+      { label: "24時間サポート", value: "", mode: "amount", includeInAdvance: true, includeInGuarantee: true }
     ];
     const extraDefaults = [];
 
@@ -690,28 +702,36 @@
             <input id="${id}Name" value="${label}" placeholder="例: 室内清掃費">
           </label>
           <label>金額
-            <input id="${id}Value" type="number" inputmode="numeric" min="0" value="${value}" placeholder="0">
+            <input id="${id}Value" type="number" inputmode="decimal" min="0" step="0.01" value="${value}" placeholder="0">
           </label>
         </div>`;
       return wrap;
     }
 
-    function makeMonthlyItem(index, label = "", value = "", includeInAdvance = true, includeInGuarantee = true) {
+    function makeMonthlyItem(index, label = "", value = "", includeInAdvance = true, includeInGuarantee = true, mode = "amount") {
       const id = `monthly${index}`;
       const wrap = document.createElement("div");
       wrap.className = "line-item";
       wrap.dataset.monthly = id;
       wrap.dataset.includeGuarantee = includeInGuarantee ? "1" : "0";
+      const isFlexible = mode === "percent" || label === "月次保証料";
       wrap.innerHTML = `
         <div class="line-title"><span id="${id}Title">月次費用</span><output id="${id}Output">0円/月</output></div>
         <div class="grid-2">
           <label>項目名
             <input id="${id}Name" value="${label}" placeholder="例: 町会費">
           </label>
-          <label>月額
-            <input id="${id}Value" type="number" inputmode="numeric" min="0" value="${value}" placeholder="0">
+          <label>${isFlexible ? "数値" : "月額"}
+            <input id="${id}Value" type="number" inputmode="decimal" min="0" step="0.01" value="${value}" placeholder="0">
           </label>
         </div>
+        ${isFlexible ? `
+          <label>指定方法
+            <select id="${id}Mode">
+              <option value="percent">総賃料%</option>
+              <option value="amount">金額指定</option>
+            </select>
+          </label>` : `<input id="${id}Mode" type="hidden" value="amount">`}
         <label class="toggle">
           <input id="${id}IncludeAdvance" type="checkbox" ${includeInAdvance ? "checked" : ""}>
           前賃料に含める
@@ -720,6 +740,7 @@
           <input id="${id}IncludeGuarantee" type="checkbox" ${includeInGuarantee ? "checked" : ""}>
           初回保証料の算定に含める
         </label>`;
+      wrap.querySelector(`#${id}Mode`).value = mode;
       return wrap;
     }
 
@@ -769,7 +790,9 @@
     }
 
     function monthlyFeeAmount(row) {
-      return money(byId(`${row.dataset.monthly}Value`).value);
+      const id = row.dataset.monthly;
+      const value = Number(byId(`${id}Value`).value) || 0;
+      return byId(`${id}Mode`).value === "percent" ? money(housingMonthly() * value / 100) : money(value);
     }
 
     function monthlyFeesTotal() {
@@ -921,10 +944,14 @@
         : `${freeRentTargetLabel()}を対象に、契約開始日から指定日数分を無料として計算します。`;
       monthlyRows().forEach((row) => {
         const id = row.dataset.monthly;
-        row.classList.toggle("is-muted", !byId(`${id}IncludeAdvance`).checked);
+        const includedSomewhere = byId(`${id}IncludeAdvance`).checked || byId(`${id}IncludeGuarantee`).checked;
+        row.classList.toggle("is-muted", !includedSomewhere);
       });
       byId("includeNextMonth").closest(".line-item").classList.toggle("is-muted", !byId("includeNextMonth").checked);
       byId("includeMonthAfter").closest(".line-item").classList.toggle("is-muted", !byId("includeMonthAfter").checked);
+      document.querySelectorAll(".toggle input").forEach((input) => {
+        input.closest(".toggle").classList.toggle("is-on", input.checked);
+      });
     }
 
     function calculate() {
@@ -1402,7 +1429,7 @@
     }
 
     monthlyDefaults.forEach((item, index) => {
-      byId("monthlyItems").appendChild(makeMonthlyItem(index, item.label, item.value, item.includeInAdvance, item.includeInGuarantee));
+      byId("monthlyItems").appendChild(makeMonthlyItem(index, item.label, item.value, item.includeInAdvance, item.includeInGuarantee, item.mode));
     });
     contractDefs.forEach((def) => byId("contractItems").appendChild(makeLineItem(def)));
     extraDefaults.forEach(([label, value], index) => byId("extraItems").appendChild(makeExtraItem(index, label, value)));
