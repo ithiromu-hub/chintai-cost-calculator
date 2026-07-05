@@ -212,6 +212,27 @@
       line-height: 1.45;
     }
 
+    .advance-breakdown {
+      display: grid;
+      gap: 4px;
+      padding: 9px 10px;
+      border: 1px solid #e5eaf0;
+      border-radius: 8px;
+      background: #f7f9fb;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .advance-breakdown:empty {
+      display: none;
+    }
+
+    .advance-breakdown strong {
+      color: var(--ink);
+      font-weight: 800;
+    }
+
     .mode-row {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -248,7 +269,7 @@
       bottom: 0;
       z-index: 5;
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 9px;
       padding: 12px 0 0;
       background: linear-gradient(transparent, var(--base) 28%);
@@ -462,6 +483,7 @@
         <div class="fields">
           <div class="line-item">
             <div class="line-title">当月日割前賃料 <output id="proratedOutput">0円</output></div>
+            <div class="advance-breakdown" id="currentAdvanceBreakdown"></div>
             <div class="grid-3">
               <label>対象日数
                 <input id="currentChargeDays" readonly value="0日">
@@ -476,6 +498,7 @@
           </div>
           <div class="line-item">
             <div class="line-title">翌月分前賃料 <output id="nextMonthOutput">0円</output></div>
+            <div class="advance-breakdown" id="nextMonthBreakdown"></div>
             <div class="reference-note" id="nextMonthNote"></div>
             <label class="toggle">
               <input id="includeNextMonth" type="checkbox" checked>
@@ -484,6 +507,7 @@
           </div>
           <div class="line-item">
             <div class="line-title">翌々月分前賃料 <output id="monthAfterOutput">0円</output></div>
+            <div class="advance-breakdown" id="monthAfterBreakdown"></div>
             <div class="reference-note" id="monthAfterNote"></div>
             <label class="toggle">
               <input id="includeMonthAfter" type="checkbox">
@@ -505,9 +529,11 @@
             </div>
             <div class="reference-note" id="freeRentNote"></div>
             <div class="grid-2">
-              <label class="toggle">
-                <input id="freeRentIncludesManagement" type="checkbox">
-                管理費も無料対象に含める
+              <label>無料対象
+                <select id="freeRentTarget">
+                  <option value="rent">賃料のみ</option>
+                  <option value="rentManagement">賃料+管理費</option>
+                </select>
               </label>
             </div>
           </div>
@@ -533,6 +559,7 @@
 
     <div class="actions">
       <button id="shareImage" type="button">画像で共有</button>
+      <button class="secondary" id="saveImage" type="button">画像保存</button>
       <button class="secondary" id="printPdf" type="button">PDF保存/共有</button>
     </div>
   </div>
@@ -560,6 +587,7 @@
     const management = () => money(byId("management").value);
     const housingMonthly = () => rent() + management();
     const monthly = () => housingMonthly() + monthlyFeesTotal();
+    const guaranteeBaseMonthly = () => housingMonthly() + guaranteeMonthlyFeesTotal();
 
     const contractDefs = [
       { id: "deposit", label: "敷金", type: "rentMonthOrAmount", mode: "month", value: "1" },
@@ -570,11 +598,11 @@
       { id: "fireInsurance", label: "火災保険料", type: "amountOnly", value: "" }
     ];
     const monthlyDefaults = [
-      { label: "口座振替事務手数料", value: "", includeInAdvance: false },
-      { label: "月次保証料", value: "", includeInAdvance: false },
-      { label: "町会費", value: "", includeInAdvance: true },
-      { label: "火災保険料", value: "", includeInAdvance: true },
-      { label: "24時間サポート", value: "", includeInAdvance: true }
+      { label: "口座振替事務手数料", value: "", includeInAdvance: false, includeInGuarantee: false },
+      { label: "月次保証料", value: "", includeInAdvance: false, includeInGuarantee: false },
+      { label: "町会費", value: "", includeInAdvance: true, includeInGuarantee: true },
+      { label: "火災保険料", value: "", includeInAdvance: true, includeInGuarantee: true },
+      { label: "24時間サポート", value: "", includeInAdvance: true, includeInGuarantee: true }
     ];
     const extraDefaults = [];
 
@@ -616,6 +644,7 @@
         wrap.querySelector(`#${id}Mode`).value = "month";
         wrap.querySelector(`#${id}Value`).value = value;
       } else if (type === "monthlyPercentOrAmount") {
+        const detail = id === "guarantee" ? `<div class="reference-note" id="${id}Note"></div>` : "";
         wrap.innerHTML = `
           <div class="line-title">${label}<output id="${id}Output">0円</output></div>
           <div class="mode-row compact">
@@ -628,7 +657,8 @@
                 <option value="amount">金額指定</option>
               </select>
             </label>
-          </div>`;
+          </div>
+          ${detail}`;
         wrap.querySelector(`#${id}Mode`).value = mode;
         wrap.querySelector(`#${id}Value`).value = value;
       } else {
@@ -666,11 +696,12 @@
       return wrap;
     }
 
-    function makeMonthlyItem(index, label = "", value = "", includeInAdvance = true) {
+    function makeMonthlyItem(index, label = "", value = "", includeInAdvance = true, includeInGuarantee = true) {
       const id = `monthly${index}`;
       const wrap = document.createElement("div");
       wrap.className = "line-item";
       wrap.dataset.monthly = id;
+      wrap.dataset.includeGuarantee = includeInGuarantee ? "1" : "0";
       wrap.innerHTML = `
         <div class="line-title"><span id="${id}Title">月次費用</span><output id="${id}Output">0円/月</output></div>
         <div class="grid-2">
@@ -684,6 +715,10 @@
         <label class="toggle">
           <input id="${id}IncludeAdvance" type="checkbox" ${includeInAdvance ? "checked" : ""}>
           前賃料に含める
+        </label>
+        <label class="toggle">
+          <input id="${id}IncludeGuarantee" type="checkbox" ${includeInGuarantee ? "checked" : ""}>
+          初回保証料の算定に含める
         </label>`;
       return wrap;
     }
@@ -704,7 +739,7 @@
       if (def.type === "monthlyPercentOrAmount") {
         const mode = byId(`${id}Mode`).value;
         const value = Number(byId(`${id}Value`).value) || 0;
-        return mode === "percent" ? money(monthly() * value / 100) : money(value);
+        return mode === "percent" ? money(guaranteeBaseMonthly() * value / 100) : money(value);
       }
       return money(byId(`${id}AmountValue`).value);
     }
@@ -748,13 +783,23 @@
       }, 0);
     }
 
+    function isGuaranteeExcludedMonthly(row) {
+      const id = row.dataset.monthly;
+      return !byId(`${id}IncludeGuarantee`).checked;
+    }
+
+    function guaranteeMonthlyFeesTotal() {
+      return monthlyRows().reduce((total, row) => total + (isGuaranteeExcludedMonthly(row) ? 0 : monthlyFeeAmount(row)), 0);
+    }
+
     function monthlyFeeLines() {
       return monthlyRows().map((row) => {
         const id = row.dataset.monthly;
         return {
           name: byId(`${id}Name`).value.trim() || "月次費用",
           amount: monthlyFeeAmount(row),
-          includeInAdvance: byId(`${id}IncludeAdvance`).checked
+          includeInAdvance: byId(`${id}IncludeAdvance`).checked,
+          includeInGuarantee: !isGuaranteeExcludedMonthly(row)
         };
       }).filter((item) => item.amount > 0);
     }
@@ -772,7 +817,7 @@
       if (!start || !end || end < start) {
         return { amount: 0, gross: 0, free: 0, charged: 0, days: 0, label: "" };
       }
-      const freeMgmt = byId("freeRentIncludesManagement").checked;
+      const freeMgmt = byId("freeRentTarget").value === "rentManagement";
       let gross = 0;
       let charged = 0;
       let free = 0;
@@ -831,6 +876,34 @@
       };
     }
 
+    function freeRentTargetLabel() {
+      return byId("freeRentTarget").value === "rentManagement" ? "賃料+管理費" : "賃料のみ";
+    }
+
+    function advanceBreakdownHtml(period, included = true) {
+      const chargeLabel = included ? "請求額" : "参考請求額";
+      const chargeAmount = included ? period.amount : period.referenceAmount;
+      return `
+        <div>請求前 <strong>${fmt(period.gross)}</strong></div>
+        <div>フリーレント控除 <strong>${fmt(period.free ? -period.free : 0)}</strong>（${freeRentTargetLabel()}）</div>
+        <div>${chargeLabel} <strong>${fmt(chargeAmount)}</strong></div>`;
+    }
+
+    function advanceBreakdownText(period, included = true) {
+      const chargeLabel = included ? "請求" : "参考";
+      const chargeAmount = included ? period.amount : period.referenceAmount;
+      return `請求前 ${fmt(period.gross)} / 控除 ${fmt(period.free ? -period.free : 0)} / ${chargeLabel} ${fmt(chargeAmount)}`;
+    }
+
+    function advanceReferenceLines(totals) {
+      if (totals.freeTotal <= 0) return [];
+      return [
+        { label: "当月日割前賃料", period: totals.advance.current, included: true },
+        { label: "翌月分前賃料", period: totals.advance.next, included: totals.advance.next.included },
+        { label: "翌々月分前賃料", period: totals.advance.monthAfter, included: totals.advance.monthAfter.included }
+      ].filter((item) => item.period.gross > 0 || item.period.free > 0 || item.included);
+    }
+
     function extraRows() {
       return Array.from(document.querySelectorAll("[data-extra]"));
     }
@@ -844,8 +917,8 @@
       const freeMode = byId("freeRentMode").value;
       byId("freeRentValue").step = freeMode === "months" ? "0.5" : "1";
       byId("freeRentNote").textContent = freeMode === "months"
-        ? "契約開始月の日数を基準に無料日数へ換算します。"
-        : "契約開始日から指定日数分を無料として計算します。";
+        ? `${freeRentTargetLabel()}を対象に、契約開始月の日数を基準に無料日数へ換算します。`
+        : `${freeRentTargetLabel()}を対象に、契約開始日から指定日数分を無料として計算します。`;
       monthlyRows().forEach((row) => {
         const id = row.dataset.monthly;
         row.classList.toggle("is-muted", !byId(`${id}IncludeAdvance`).checked);
@@ -869,14 +942,24 @@
         contractTotal += amount;
         byId(`${def.id}Output`).textContent = fmt(amount);
       });
+      if (byId("guaranteeNote")) {
+        const excluded = monthlyFeeLines().filter((item) => !item.includeInGuarantee).map((item) => item.name);
+        byId("guaranteeNote").textContent = byId("guaranteeMode").value === "percent"
+          ? `算定月額: ${fmt(guaranteeBaseMonthly())}/月${excluded.length ? `（${excluded.join("・")}は除外）` : ""}`
+          : "";
+      }
 
       const advance = advanceRentBreakdown();
       byId("proratedOutput").textContent = fmt(advance.current.amount);
       byId("nextMonthOutput").textContent = advance.next.included ? fmt(advance.next.amount) : "対象外";
-      byId("nextMonthNote").textContent = advance.next.included ? "" : `参考額: ${fmt(advance.next.referenceAmount)}`;
+      byId("nextMonthNote").textContent = advance.next.included ? "" : "請求に含めない";
       byId("monthAfterOutput").textContent = advance.monthAfter.included ? fmt(advance.monthAfter.amount) : "対象外";
-      byId("monthAfterNote").textContent = advance.monthAfter.included ? "" : `参考額: ${fmt(advance.monthAfter.referenceAmount)}`;
+      byId("monthAfterNote").textContent = advance.monthAfter.included ? "" : "請求に含めない";
       byId("freeRentOutput").textContent = fmt(-advance.freeTotal);
+      const showFreeBreakdown = advance.freeTotal > 0;
+      byId("currentAdvanceBreakdown").innerHTML = showFreeBreakdown ? advanceBreakdownHtml(advance.current, true) : "";
+      byId("nextMonthBreakdown").innerHTML = showFreeBreakdown ? advanceBreakdownHtml(advance.next, advance.next.included) : "";
+      byId("monthAfterBreakdown").innerHTML = showFreeBreakdown ? advanceBreakdownHtml(advance.monthAfter, advance.monthAfter.included) : "";
       byId("currentChargeDays").value = `${advance.current.days}日`;
       const startDate = parseLocalDate(byId("contractStartDate").value);
       byId("currentFreeDays").value = `${Math.round(advance.current.free > 0 ? Math.min(freeRentDays(startDate), advance.current.days) : 0)}日`;
@@ -917,7 +1000,6 @@
         ["翌月分前賃料", totals.next],
         ["翌々月分前賃料", totals.monthAfter]
       );
-      if (totals.freeTotal > 0) rows.push(["フリーレント控除", -totals.freeTotal]);
       extraRows().forEach((row) => {
         const id = row.dataset.extra;
         const name = byId(`${id}Name`).value.trim() || "追加費用";
@@ -941,9 +1023,17 @@
       const start = byId("contractStartDate").value;
       const memo = byId("memo").value.trim();
       const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
+      const advanceReferences = advanceReferenceLines(totals).map((item) => `
+        <div style="padding:6px 0;border-bottom:1px solid #e5eaf0;">
+          <div style="display:flex;justify-content:space-between;gap:12px;">
+            <strong>${escapeHtml(item.label)}</strong>
+            <span>${item.included ? "請求に含む" : "請求対象外"}</span>
+          </div>
+          <div style="color:#687381;margin-top:2px;">${escapeHtml(advanceBreakdownText(item.period, item.included))}</div>
+        </div>`).join("");
       const monthlyReferences = monthlyFeeLines().map((item) => `
         <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #e5eaf0;">
-          <span>${escapeHtml(item.name)} <small style="color:#687381;">${item.includeInAdvance ? "前賃料に含む" : "前賃料対象外"}</small></span>
+          <span>${escapeHtml(item.name)} <small style="color:#687381;">${item.includeInAdvance ? "前賃料に含む" : "前賃料対象外"} / ${item.includeInGuarantee ? "保証料算定対象" : "保証料算定外"}</small></span>
           <strong>${fmt(item.amount)}/月</strong>
         </div>`).join("");
       const rows = rowsForShare().map(([name, amount]) => `
@@ -981,6 +1071,11 @@
               </thead>
               <tbody>${rows}</tbody>
             </table>
+            ${advanceReferences ? `
+              <div style="margin-top:16px;padding:12px 14px;border:1px solid #d4dbe3;background:#ffffff;">
+                <div style="font-size:14px;font-weight:700;margin-bottom:4px;">前賃料内訳（フリーレント: ${escapeHtml(freeRentTargetLabel())}）</div>
+                <div style="font-size:13px;line-height:1.45;">${advanceReferences}</div>
+              </div>` : ""}
             ${monthlyReferences ? `
               <div style="margin-top:16px;padding:12px 14px;border:1px solid #d4dbe3;background:#f7f9fb;">
                 <div style="font-size:14px;font-weight:700;margin-bottom:4px;">月次費用</div>
@@ -1026,15 +1121,17 @@
       const memo = byId("memo").value.trim();
       const totals = calculate();
       const monthlyLines = monthlyFeeLines();
+      const advanceLines = advanceReferenceLines(totals);
       const canvas = document.createElement("canvas");
       const width = 1170;
       const rowHeight = 56;
       const tableTop = 356;
       const tableHeaderHeight = 44;
+      const advanceBlockHeight = advanceLines.length ? 86 + advanceLines.length * 54 : 0;
       const monthlyBlockHeight = monthlyLines.length ? 90 + monthlyLines.length * 34 : 0;
       const memoHeight = memo ? 106 : 0;
       const footerHeight = 112;
-      const height = tableTop + tableHeaderHeight + rows.length * rowHeight + monthlyBlockHeight + memoHeight + footerHeight;
+      const height = tableTop + tableHeaderHeight + rows.length * rowHeight + advanceBlockHeight + monthlyBlockHeight + memoHeight + footerHeight;
       const scale = 2;
       canvas.width = width * scale;
       canvas.height = height * scale;
@@ -1102,6 +1199,31 @@
         ctx.fillText(fmt(amount), width - 88, y + 37);
         y += rowHeight;
       });
+      if (advanceLines.length) {
+        y += 18;
+        const blockHeight = advanceBlockHeight - 18;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(70, y, width - 140, blockHeight);
+        ctx.strokeStyle = "#d4dbe3";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(70, y, width - 140, blockHeight);
+        ctx.fillStyle = "#1f2933";
+        ctx.font = "bold 21px -apple-system, BlinkMacSystemFont, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(`前賃料内訳（フリーレント: ${freeRentTargetLabel()}）`, 88, y + 32);
+        let advanceY = y + 68;
+        advanceLines.forEach((item) => {
+          ctx.fillStyle = "#1f2933";
+          ctx.font = "bold 19px -apple-system, BlinkMacSystemFont, sans-serif";
+          ctx.textAlign = "left";
+          ctx.fillText(`${item.label} ${item.included ? "" : "（請求対象外）"}`, 88, advanceY);
+          ctx.font = "18px -apple-system, BlinkMacSystemFont, sans-serif";
+          ctx.fillStyle = "#687381";
+          ctx.fillText(advanceBreakdownText(item.period, item.included), 88, advanceY + 26);
+          advanceY += 54;
+        });
+        y += advanceBlockHeight;
+      }
       if (monthlyLines.length) {
         y += 18;
         const blockHeight = monthlyBlockHeight - 18;
@@ -1119,7 +1241,7 @@
           ctx.fillStyle = "#1f2933";
           ctx.font = "19px -apple-system, BlinkMacSystemFont, sans-serif";
           ctx.textAlign = "left";
-          ctx.fillText(`${item.name}（${item.includeInAdvance ? "前賃料に含む" : "前賃料対象外"}）`, 88, monthlyY);
+          ctx.fillText(`${item.name}（${item.includeInAdvance ? "前賃料に含む" : "前賃料対象外"} / ${item.includeInGuarantee ? "保証料算定対象" : "保証料算定外"}）`, 88, monthlyY);
           ctx.font = "bold 20px -apple-system, BlinkMacSystemFont, sans-serif";
           ctx.textAlign = "right";
           ctx.fillText(`${fmt(item.amount)}/月`, width - 88, monthlyY);
@@ -1200,15 +1322,20 @@
       return new Blob([bytes], { type: mime });
     }
 
+    function makeImageFile() {
+      const canvas = makeCanvas();
+      const dataUrl = canvas.toDataURL("image/png");
+      const blob = dataUrlToBlob(dataUrl);
+      const file = new File([blob], "賃貸初期費用概算.png", { type: "image/png" });
+      return { dataUrl, blob, file };
+    }
+
     async function shareImage() {
       const button = byId("shareImage");
       button.disabled = true;
       button.textContent = "作成中...";
       try {
-        const canvas = makeCanvas();
-        const dataUrl = canvas.toDataURL("image/png");
-        const blob = dataUrlToBlob(dataUrl);
-        const file = new File([blob], "賃貸初期費用概算.png", { type: "image/png" });
+        const { dataUrl, file } = makeImageFile();
 
         if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
           try {
@@ -1227,6 +1354,30 @@
       } finally {
         button.disabled = false;
         button.textContent = "画像で共有";
+      }
+    }
+
+    async function saveImage() {
+      const button = byId("saveImage");
+      button.disabled = true;
+      button.textContent = "作成中...";
+      try {
+        const { dataUrl, blob, file } = makeImageFile();
+        showImagePreview(dataUrl, file.name);
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        showToast("保存が始まらない場合は、表示された画像を長押しして保存してください。");
+      } catch (error) {
+        showToast(`画像作成に失敗しました: ${error.message}`);
+      } finally {
+        button.disabled = false;
+        button.textContent = "画像保存";
       }
     }
 
@@ -1251,7 +1402,7 @@
     }
 
     monthlyDefaults.forEach((item, index) => {
-      byId("monthlyItems").appendChild(makeMonthlyItem(index, item.label, item.value, item.includeInAdvance));
+      byId("monthlyItems").appendChild(makeMonthlyItem(index, item.label, item.value, item.includeInAdvance, item.includeInGuarantee));
     });
     contractDefs.forEach((def) => byId("contractItems").appendChild(makeLineItem(def)));
     extraDefaults.forEach(([label, value], index) => byId("extraItems").appendChild(makeExtraItem(index, label, value)));
@@ -1264,6 +1415,7 @@
       calculate();
     });
     byId("shareImage").addEventListener("click", shareImage);
+    byId("saveImage").addEventListener("click", saveImage);
     byId("printPdf").addEventListener("click", printPdf);
     byId("closePreview").addEventListener("click", () => byId("imagePreview").classList.remove("show"));
     byId("customerName").addEventListener("blur", () => {
