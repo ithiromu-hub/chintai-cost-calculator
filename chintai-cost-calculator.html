@@ -206,6 +206,12 @@
       white-space: nowrap;
     }
 
+    .reference-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
     .mode-row {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -459,16 +465,18 @@
           </div>
           <div class="line-item">
             <div class="line-title">翌月分賃料・管理費 <output id="nextMonthOutput">0円</output></div>
+            <div class="reference-note" id="nextMonthNote"></div>
             <label class="toggle">
               <input id="includeNextMonth" type="checkbox" checked>
-              翌月分を含める
+              請求に含める
             </label>
           </div>
           <div class="line-item">
             <div class="line-title">翌々月分賃料・管理費 <output id="monthAfterOutput">0円</output></div>
+            <div class="reference-note" id="monthAfterNote"></div>
             <label class="toggle">
               <input id="includeMonthAfter" type="checkbox">
-              場合により翌々月分も含める
+              請求に含める
             </label>
           </div>
           <div class="line-item">
@@ -616,11 +624,18 @@
         wrap.querySelector(`#${id}PercentValue`).value = mode === "percent" ? value : "";
         wrap.querySelector(`#${id}AmountValue`).value = mode === "amount" ? value : "";
       } else {
+        const detailField = id === "fireInsurance" ? `
+          <label>契約年数
+            <input id="${id}Years" type="number" inputmode="decimal" min="0" step="0.5" placeholder="例: 2">
+          </label>` : "";
         wrap.innerHTML = `
           <div class="line-title">${label}<output id="${id}Output">0円</output></div>
-          <label>金額
-            <input id="${id}AmountValue" type="number" inputmode="numeric" min="0" value="${value}" placeholder="0">
-          </label>`;
+          <div class="${detailField ? "grid-2" : ""}">
+            <label>金額
+              <input id="${id}AmountValue" type="number" inputmode="numeric" min="0" value="${value}" placeholder="0">
+            </label>
+            ${detailField}
+          </div>`;
       }
       return wrap;
     }
@@ -725,8 +740,8 @@
       if (!start) {
         return {
           current: { amount: 0, gross: 0, free: 0, charged: 0, days: 0, label: "" },
-          next: { amount: 0, gross: 0, free: 0, charged: 0, days: 0, label: "" },
-          monthAfter: { amount: 0, gross: 0, free: 0, charged: 0, days: 0, label: "" },
+          next: { amount: 0, referenceAmount: 0, included: true, gross: 0, free: 0, charged: 0, days: 0, label: "" },
+          monthAfter: { amount: 0, referenceAmount: 0, included: false, gross: 0, free: 0, charged: 0, days: 0, label: "" },
           freeTotal: 0
         };
       }
@@ -738,9 +753,18 @@
       const afterStart = new Date(start.getFullYear(), start.getMonth() + 2, 1);
       const afterEnd = new Date(start.getFullYear(), start.getMonth() + 3, 0);
       const current = chargeForPeriod(start, currentEnd, freeEnd);
-      const next = byId("includeNextMonth").checked ? chargeForPeriod(nextStart, nextEnd, freeEnd) : { amount: 0, gross: 0, free: 0, charged: 0, days: 0, label: monthLabel(nextStart) };
-      const monthAfter = byId("includeMonthAfter").checked ? chargeForPeriod(afterStart, afterEnd, freeEnd) : { amount: 0, gross: 0, free: 0, charged: 0, days: 0, label: monthLabel(afterStart) };
-      return { current, next, monthAfter, freeTotal: current.free + next.free + monthAfter.free };
+      const nextCalc = chargeForPeriod(nextStart, nextEnd, freeEnd);
+      const monthAfterCalc = chargeForPeriod(afterStart, afterEnd, freeEnd);
+      const nextIncluded = byId("includeNextMonth").checked;
+      const monthAfterIncluded = byId("includeMonthAfter").checked;
+      const next = { ...nextCalc, included: nextIncluded, referenceAmount: nextCalc.amount, amount: nextIncluded ? nextCalc.amount : 0 };
+      const monthAfter = { ...monthAfterCalc, included: monthAfterIncluded, referenceAmount: monthAfterCalc.amount, amount: monthAfterIncluded ? monthAfterCalc.amount : 0 };
+      return {
+        current,
+        next,
+        monthAfter,
+        freeTotal: current.free + (nextIncluded ? nextCalc.free : 0) + (monthAfterIncluded ? monthAfterCalc.free : 0)
+      };
     }
 
     function extraRows() {
@@ -786,12 +810,14 @@
 
       const advance = advanceRentBreakdown();
       byId("proratedOutput").textContent = fmt(advance.current.amount);
-      byId("nextMonthOutput").textContent = fmt(advance.next.amount);
-      byId("monthAfterOutput").textContent = fmt(advance.monthAfter.amount);
+      byId("nextMonthOutput").textContent = advance.next.included ? fmt(advance.next.amount) : "対象外";
+      byId("nextMonthNote").textContent = advance.next.included ? "" : `参考額: ${fmt(advance.next.referenceAmount)}`;
+      byId("monthAfterOutput").textContent = advance.monthAfter.included ? fmt(advance.monthAfter.amount) : "対象外";
+      byId("monthAfterNote").textContent = advance.monthAfter.included ? "" : `参考額: ${fmt(advance.monthAfter.referenceAmount)}`;
       byId("freeRentOutput").textContent = fmt(-advance.freeTotal);
       byId("currentChargeDays").value = `${advance.current.days}日`;
-      byId("currentFreeDays").value = `${Math.round(advance.current.free > 0 ? Math.min(freeRentDays(startDate), advance.current.days) : 0)}日`;
       const startDate = parseLocalDate(byId("contractStartDate").value);
+      byId("currentFreeDays").value = `${Math.round(advance.current.free > 0 ? Math.min(freeRentDays(startDate), advance.current.days) : 0)}日`;
       byId("daysInMonth").value = startDate ? `${daysIn(startDate)}日` : "0日";
       const advanceTotal = advance.current.amount + advance.next.amount + advance.monthAfter.amount;
 
@@ -823,7 +849,7 @@
 
     function rowsForShare() {
       const totals = calculate();
-      const rows = contractDefs.map((def) => [def.label, lineAmount(def.id)]);
+      const rows = contractDefs.map((def) => [displayContractLabel(def), lineAmount(def.id)]);
       rows.push(
         ["当月日割賃料・管理費", totals.proratedAmount],
         ["翌月分賃料・管理費", totals.next],
@@ -836,6 +862,14 @@
         rows.push([name, money(byId(`${id}Value`).value)]);
       });
       return rows.filter(([, amount]) => amount !== 0);
+    }
+
+    function displayContractLabel(def) {
+      if (def.id === "fireInsurance") {
+        const years = Number(byId("fireInsuranceYears")?.value) || 0;
+        if (years > 0) return `${def.label}（${years}年）`;
+      }
+      return def.label;
     }
 
     function buildShareCard() {
