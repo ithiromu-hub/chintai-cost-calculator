@@ -481,19 +481,19 @@
           </div>
           <div class="line-item">
             <div class="line-title">フリーレント控除 <output id="freeRentOutput">0円</output></div>
-            <div class="grid-3">
+            <div class="grid-2">
+              <label>数値
+                <input id="freeRentValue" type="number" inputmode="decimal" min="0" step="0.5" value="0">
+              </label>
               <label>指定方法
                 <select id="freeRentMode">
                   <option value="months">ヶ月</option>
                   <option value="days">日数</option>
                 </select>
               </label>
-              <label id="freeRentMonthsField">無料ヶ月
-                <input id="freeRentMonths" type="number" inputmode="decimal" min="0" step="0.5" value="0">
-              </label>
-              <label id="freeRentDaysField" hidden>無料日数
-                <input id="freeRentDays" type="number" inputmode="numeric" min="0" value="0">
-              </label>
+            </div>
+            <div class="reference-note" id="freeRentNote"></div>
+            <div class="grid-2">
               <label class="toggle">
                 <input id="freeRentIncludesManagement" type="checkbox">
                 管理費も無料対象に含める
@@ -568,61 +568,50 @@
         wrap.innerHTML = `
           <div class="line-title">${label}<output id="${id}Output">0円</output></div>
           <div class="mode-row compact">
-            <label>計算方法
+            <label>数値
+              <input id="${id}Value" type="number" inputmode="decimal" min="0" step="0.01">
+            </label>
+            <label>指定方法
               <select id="${id}Mode">
-                <option value="month">月数</option>
+                <option value="month">ヶ月</option>
                 <option value="amount">金額指定</option>
               </select>
             </label>
-            <label id="${id}MonthField">賃料の月数
-              <input id="${id}MonthValue" type="number" inputmode="decimal" min="0" step="0.01">
-            </label>
-            <label id="${id}AmountField" hidden>金額
-              <input id="${id}AmountValue" type="number" inputmode="numeric" min="0">
-            </label>
           </div>`;
         wrap.querySelector(`#${id}Mode`).value = mode;
-        wrap.querySelector(`#${id}MonthValue`).value = mode === "month" ? value : "";
-        wrap.querySelector(`#${id}AmountValue`).value = mode === "amount" ? value : "";
+        wrap.querySelector(`#${id}Value`).value = value;
       } else if (type === "brokerage") {
         wrap.innerHTML = `
           <div class="line-title">${label}<output id="${id}Output">0円</output></div>
           <div class="mode-row compact">
-            <label>賃料に対する倍率
-              <select id="${id}Multiplier">
-                <option value="1.1">1.1ヶ月</option>
-                <option value="1">1ヶ月</option>
-                <option value="0.55">0.55ヶ月</option>
-                <option value="0.5">0.5ヶ月</option>
-                <option value="0">なし</option>
-                <option value="custom">手入力</option>
+            <label>数値
+              <input id="${id}Value" type="number" inputmode="decimal" min="0" step="0.01">
+            </label>
+            <label>指定方法
+              <select id="${id}Mode">
+                <option value="month">ヶ月</option>
+                <option value="amount">金額指定</option>
               </select>
             </label>
-            <label id="${id}CustomField" hidden>手入力倍率
-              <input id="${id}CustomMultiplier" type="number" inputmode="decimal" min="0" step="0.01" value="1.1">
-            </label>
           </div>`;
-        wrap.querySelector(`#${id}Multiplier`).value = value;
+        wrap.querySelector(`#${id}Mode`).value = "month";
+        wrap.querySelector(`#${id}Value`).value = value;
       } else if (type === "monthlyPercentOrAmount") {
         wrap.innerHTML = `
           <div class="line-title">${label}<output id="${id}Output">0円</output></div>
           <div class="mode-row compact">
-            <label>計算方法
+            <label>数値
+              <input id="${id}Value" type="number" inputmode="decimal" min="0" step="1">
+            </label>
+            <label>指定方法
               <select id="${id}Mode">
                 <option value="percent">月額総額%</option>
                 <option value="amount">金額指定</option>
               </select>
             </label>
-            <label id="${id}PercentField">月額総額に対する%
-              <input id="${id}PercentValue" type="number" inputmode="decimal" min="0" step="1">
-            </label>
-            <label id="${id}AmountField" hidden>金額
-              <input id="${id}AmountValue" type="number" inputmode="numeric" min="0">
-            </label>
           </div>`;
         wrap.querySelector(`#${id}Mode`).value = mode;
-        wrap.querySelector(`#${id}PercentValue`).value = mode === "percent" ? value : "";
-        wrap.querySelector(`#${id}AmountValue`).value = mode === "amount" ? value : "";
+        wrap.querySelector(`#${id}Value`).value = value;
       } else {
         const detailField = id === "fireInsurance" ? `
           <label>契約年数
@@ -663,16 +652,18 @@
       if (!def) return 0;
       if (def.type === "rentMonthOrAmount") {
         const mode = byId(`${id}Mode`).value;
-        return mode === "month" ? money(rent() * (Number(byId(`${id}MonthValue`).value) || 0)) : money(byId(`${id}AmountValue`).value);
+        const value = Number(byId(`${id}Value`).value) || 0;
+        return mode === "month" ? money(rent() * value) : money(value);
       }
       if (def.type === "brokerage") {
-        const selected = byId(`${id}Multiplier`).value;
-        const multiplier = selected === "custom" ? Number(byId(`${id}CustomMultiplier`).value) || 0 : Number(selected) || 0;
-        return money(rent() * multiplier);
+        const mode = byId(`${id}Mode`).value;
+        const value = Number(byId(`${id}Value`).value) || 0;
+        return mode === "month" ? money(rent() * value) : money(value);
       }
       if (def.type === "monthlyPercentOrAmount") {
         const mode = byId(`${id}Mode`).value;
-        return mode === "percent" ? money(monthly() * (Number(byId(`${id}PercentValue`).value) || 0) / 100) : money(byId(`${id}AmountValue`).value);
+        const value = Number(byId(`${id}Value`).value) || 0;
+        return mode === "percent" ? money(monthly() * value / 100) : money(value);
       }
       return money(byId(`${id}AmountValue`).value);
     }
@@ -699,10 +690,11 @@
 
     function freeRentDays(start) {
       if (!start) return 0;
+      const value = Number(byId("freeRentValue").value) || 0;
       if (byId("freeRentMode").value === "months") {
-        return Math.round((Number(byId("freeRentMonths").value) || 0) * daysIn(start));
+        return Math.round(value * daysIn(start));
       }
-      return Math.max(0, Number(byId("freeRentDays").value) || 0);
+      return Math.max(0, value);
     }
 
     function chargeForPeriod(start, end, freeEnd) {
@@ -777,23 +769,11 @@
     }
 
     function syncUiState() {
-      contractDefs.forEach((def) => {
-        if (def.type === "rentMonthOrAmount") {
-          const mode = byId(`${def.id}Mode`).value;
-          setHidden(`${def.id}MonthField`, mode !== "month");
-          setHidden(`${def.id}AmountField`, mode !== "amount");
-        }
-        if (def.type === "brokerage") {
-          setHidden(`${def.id}CustomField`, byId(`${def.id}Multiplier`).value !== "custom");
-        }
-        if (def.type === "monthlyPercentOrAmount") {
-          const mode = byId(`${def.id}Mode`).value;
-          setHidden(`${def.id}PercentField`, mode !== "percent");
-          setHidden(`${def.id}AmountField`, mode !== "amount");
-        }
-      });
-      setHidden("freeRentMonthsField", byId("freeRentMode").value !== "months");
-      setHidden("freeRentDaysField", byId("freeRentMode").value !== "days");
+      const freeMode = byId("freeRentMode").value;
+      byId("freeRentValue").step = freeMode === "months" ? "0.5" : "1";
+      byId("freeRentNote").textContent = freeMode === "months"
+        ? "契約開始月の日数を基準に無料日数へ換算します。"
+        : "契約開始日から指定日数分を無料として計算します。";
       byId("includeNextMonth").closest(".line-item").classList.toggle("is-muted", !byId("includeNextMonth").checked);
       byId("includeMonthAfter").closest(".line-item").classList.toggle("is-muted", !byId("includeMonthAfter").checked);
     }
@@ -875,7 +855,7 @@
     function buildShareCard() {
       const totals = calculate();
       const property = displayProperty();
-      const customer = byId("customerName").value.trim();
+      const customer = displayCustomerName();
       const start = byId("contractStartDate").value;
       const memo = byId("memo").value.trim();
       const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
@@ -933,19 +913,34 @@
       return [property || "物件名未入力", room].filter(Boolean).join(" ");
     }
 
+    function displayCustomerName() {
+      const value = byId("customerName").value.trim();
+      if (!value) return "";
+      return value.endsWith("様") ? value : `${value}様`;
+    }
+
+    function normalizeCustomerName() {
+      const input = byId("customerName");
+      const value = input.value.trim();
+      if (value && !value.endsWith("様")) input.value = `${value}様`;
+    }
+
     function makeCanvas() {
       buildShareCard();
       const rows = rowsForShare();
       const property = displayProperty();
-      const customer = byId("customerName").value.trim();
+      const customer = displayCustomerName();
       const start = byId("contractStartDate").value;
       const memo = byId("memo").value.trim();
       const totals = calculate();
       const canvas = document.createElement("canvas");
       const width = 1170;
-      const rowHeight = 58;
-      const memoHeight = memo ? 104 : 0;
-      const height = 430 + rows.length * rowHeight + memoHeight;
+      const rowHeight = 56;
+      const tableTop = 356;
+      const tableHeaderHeight = 44;
+      const memoHeight = memo ? 106 : 0;
+      const footerHeight = 112;
+      const height = tableTop + tableHeaderHeight + rows.length * rowHeight + memoHeight + footerHeight;
       const scale = 2;
       canvas.width = width * scale;
       canvas.height = height * scale;
@@ -976,7 +971,7 @@
       ctx.fillText([customer, start ? `契約開始 ${start}` : ""].filter(Boolean).join(" / "), 70, 164);
       drawInfoBox(ctx, 70, 214, 490, "賃料+管理費", `${fmt(monthly())}/月`, "#1f2933", "#f7f9fb", "#d4dbe3");
       drawInfoBox(ctx, 610, 214, 490, "概算合計", fmt(totals.grand), "#0f766e", "#f0fdfa", "#0f766e");
-      let y = 356;
+      let y = tableTop;
       ctx.fillStyle = "#eef2f5";
       ctx.fillRect(70, y, width - 140, 44);
       ctx.strokeStyle = "#1f2933";
@@ -1027,9 +1022,10 @@
       ctx.fillStyle = "#687381";
       ctx.font = "19px -apple-system, BlinkMacSystemFont, sans-serif";
       ctx.textAlign = "left";
-      wrapText(ctx, "概算のため、審査内容・契約開始日・管理会社指定条件により変動する場合があります。", 70, height - 74, width - 220, 26, 2);
+      ctx.fillRect(70, y + 10, width - 140, 1);
+      wrapText(ctx, "概算のため、審査内容・契約開始日・管理会社指定条件により変動する場合があります。", 70, y + 48, width - 220, 26, 2);
       ctx.textAlign = "right";
-      ctx.fillText("単位: 円", width - 70, height - 74);
+      ctx.fillText("単位: 円", width - 70, y + 48);
       return canvas;
     }
 
@@ -1144,6 +1140,10 @@
     byId("shareImage").addEventListener("click", shareImage);
     byId("printPdf").addEventListener("click", printPdf);
     byId("closePreview").addEventListener("click", () => byId("imagePreview").classList.remove("show"));
+    byId("customerName").addEventListener("blur", () => {
+      normalizeCustomerName();
+      calculate();
+    });
     document.addEventListener("input", calculate);
     document.addEventListener("change", calculate);
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
