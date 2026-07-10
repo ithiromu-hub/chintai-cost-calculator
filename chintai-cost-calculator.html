@@ -576,12 +576,26 @@
     }
 
     @media print {
+      @page { size: A4 portrait; margin: 12mm; }
       body { background: #fff; }
       .app > header, .app > main, .actions, .toast { display: none; }
       #shareCard {
         position: static;
         width: auto;
         padding: 0;
+      }
+      #shareCard .estimate-sheet {
+        display: flex;
+        min-height: 273mm;
+        flex-direction: column;
+      }
+      #shareCard .estimate-content {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+      }
+      #shareCard .estimate-footer {
+        margin-top: auto !important;
       }
     }
   </style>
@@ -623,10 +637,10 @@
           </div>
           <div class="grid-2">
             <label>賃料
-              <input id="rent" type="number" inputmode="numeric" min="0" required placeholder="120000">
+              <input id="rent" type="text" inputmode="decimal" required data-money data-assume-man="true" placeholder="例: 23.5万">
             </label>
             <label>管理費・共益費
-              <input id="management" type="number" inputmode="numeric" min="0" placeholder="10000">
+              <input id="management" type="text" inputmode="decimal" data-money data-assume-man="true" placeholder="例: 1.2万">
             </label>
           </div>
         </div>
@@ -760,12 +774,25 @@
   <script>
     const byId = (id) => document.getElementById(id);
     const money = (value) => Math.max(0, Math.round(Number(value) || 0));
+    const parseMoneyInput = (value, assumeMan = false) => {
+      const normalized = String(value ?? "").trim().replace(/[,\s¥￥円]/g, "");
+      const hasMan = normalized.endsWith("万");
+      const numeric = Number(hasMan ? normalized.slice(0, -1) : normalized);
+      if (!Number.isFinite(numeric)) return 0;
+      const useMan = hasMan || (assumeMan && numeric > 0 && numeric < 1000);
+      return numeric * (useMan ? 10000 : 1);
+    };
     const fmt = (value) => {
       const amount = Math.round(Number(value) || 0);
       return `${amount < 0 ? "-" : ""}${new Intl.NumberFormat("ja-JP").format(Math.abs(amount))}円`;
     };
-    const rent = () => money(byId("rent").value);
-    const management = () => money(byId("management").value);
+    const formatMoneyInputValue = (value) => {
+      const amount = money(value);
+      if (amount >= 10000) return `${Number((amount / 10000).toFixed(4))}万`;
+      return amount > 0 ? fmt(amount) : "";
+    };
+    const rent = () => money(parseMoneyInput(byId("rent").value, true));
+    const management = () => money(parseMoneyInput(byId("management").value, true));
     const housingMonthly = () => rent() + management();
     const monthly = () => housingMonthly() + monthlyFeesTotal();
     const guaranteeBaseMonthly = () => housingMonthly() + guaranteeMonthlyFeesTotal();
@@ -798,7 +825,7 @@
           <div class="line-title">${label}<output id="${id}Output">0円</output></div>
           <div class="mode-row compact">
             <label>数値
-              <input id="${id}Value" type="number" inputmode="decimal" min="0" step="0.01">
+              <input id="${id}Value" type="text" inputmode="decimal" data-money data-money-mode="${id}Mode" data-assume-man="true">
             </label>
             <label>指定方法
               <select id="${id}Mode">
@@ -814,7 +841,7 @@
           <div class="line-title">${label}<output id="${id}Output">0円</output></div>
           <div class="mode-row compact">
             <label>数値
-              <input id="${id}Value" type="number" inputmode="decimal" min="0" step="0.01">
+              <input id="${id}Value" type="text" inputmode="decimal" data-money data-money-mode="${id}Mode" data-assume-man="true">
             </label>
             <label>指定方法
               <select id="${id}Mode">
@@ -831,7 +858,7 @@
           <div class="line-title">${label}<output id="${id}Output">0円</output></div>
           <div class="mode-row compact">
             <label>数値
-              <input id="${id}Value" type="number" inputmode="decimal" min="0" step="1">
+              <input id="${id}Value" type="text" inputmode="decimal" data-money data-money-mode="${id}Mode" data-assume-man="true">
             </label>
             <label>指定方法
               <select id="${id}Mode">
@@ -852,7 +879,7 @@
           <div class="line-title">${label}<output id="${id}Output">0円</output></div>
           <div class="${detailField ? "grid-2" : ""}">
             <label>金額
-              <input id="${id}AmountValue" type="number" inputmode="numeric" min="0" value="${value}" placeholder="0">
+              <input id="${id}AmountValue" type="text" inputmode="decimal" value="${value}" data-money data-assume-man="true" placeholder="例: 3.3万">
             </label>
             ${detailField}
           </div>`;
@@ -872,7 +899,7 @@
             <input id="${id}Name" value="${label}" placeholder="例: 室内清掃費">
           </label>
           <label>金額
-            <input id="${id}Value" type="number" inputmode="decimal" min="0" step="0.01" value="${value}" placeholder="0">
+            <input id="${id}Value" type="text" inputmode="decimal" value="${value}" data-money data-assume-man="true" placeholder="例: 8.8万">
           </label>
         </div>`;
       return wrap;
@@ -901,7 +928,7 @@
               <input id="${id}Name" value="${label}" placeholder="例: 町会費">
             </label>
             <label>${isFlexible ? "数値" : "月額"}
-              <input id="${id}Value" type="number" inputmode="decimal" min="0" step="0.01" value="${value}" placeholder="0">
+              <input id="${id}Value" type="text" inputmode="decimal" value="${value}" data-money data-money-mode="${id}Mode" placeholder="0">
             </label>
           </div>
           ${isFlexible ? `
@@ -932,19 +959,19 @@
       if (def.type === "rentMonthOrAmount") {
         const mode = byId(`${id}Mode`).value;
         const value = Number(byId(`${id}Value`).value) || 0;
-        return mode === "month" ? money(rent() * value) : money(value);
+        return mode === "month" ? money(rent() * value) : money(parseMoneyInput(byId(`${id}Value`).value, true));
       }
       if (def.type === "brokerage") {
         const mode = byId(`${id}Mode`).value;
         const value = Number(byId(`${id}Value`).value) || 0;
-        return mode === "month" ? money(rent() * value) : money(value);
+        return mode === "month" ? money(rent() * value) : money(parseMoneyInput(byId(`${id}Value`).value, true));
       }
       if (def.type === "monthlyPercentOrAmount") {
         const mode = byId(`${id}Mode`).value;
         const value = Number(byId(`${id}Value`).value) || 0;
-        return mode === "percent" ? money(guaranteeBaseMonthly() * value / 100) : money(value);
+        return mode === "percent" ? money(guaranteeBaseMonthly() * value / 100) : money(parseMoneyInput(byId(`${id}Value`).value, true));
       }
-      return money(byId(`${id}AmountValue`).value);
+      return money(parseMoneyInput(byId(`${id}AmountValue`).value, true));
     }
 
     function parseLocalDate(value) {
@@ -974,7 +1001,7 @@
     function monthlyFeeAmount(row) {
       const id = row.dataset.monthly;
       const value = Number(byId(`${id}Value`).value) || 0;
-      return byId(`${id}Mode`).value === "percent" ? money(housingMonthly() * value / 100) : money(value);
+      return byId(`${id}Mode`).value === "percent" ? money(housingMonthly() * value / 100) : money(parseMoneyInput(byId(`${id}Value`).value));
     }
 
     function monthlyFeesTotal() {
@@ -1007,6 +1034,18 @@
           includeInGuarantee: !isGuaranteeExcludedMonthly(row)
         };
       }).filter((item) => item.amount > 0);
+    }
+
+    function monthlyCostLines() {
+      const housingLines = [
+        { name: "賃料", amount: rent(), detail: "" },
+        { name: "管理費・共益費", amount: management(), detail: "" }
+      ];
+      const additionalLines = monthlyFeeLines().map((item) => ({
+        ...item,
+        detail: `前賃料: ${item.includeInAdvance ? "含む" : "対象外"} / 保証料: ${item.includeInGuarantee ? "算定対象" : "算定外"}`
+      }));
+      return [...housingLines, ...additionalLines].filter((item) => item.amount > 0);
     }
 
     function freeRentDays(start) {
@@ -1207,7 +1246,7 @@
       let extraTotal = 0;
       extraRows().forEach((row) => {
         const id = row.dataset.extra;
-        const amount = money(byId(`${id}Value`).value);
+        const amount = money(parseMoneyInput(byId(`${id}Value`).value, true));
         extraTotal += amount;
         byId(`${id}Output`).textContent = fmt(amount);
       });
@@ -1241,7 +1280,7 @@
       extraRows().forEach((row) => {
         const id = row.dataset.extra;
         const name = byId(`${id}Name`).value.trim() || "追加費用";
-        rows.push([name, money(byId(`${id}Value`).value)]);
+        rows.push([name, money(parseMoneyInput(byId(`${id}Value`).value, true))]);
       });
       return rows.filter(([, amount]) => amount !== 0);
     }
@@ -1269,18 +1308,21 @@
           </div>
           <div style="color:#687381;margin-top:2px;">${escapeHtml(advanceBreakdownText(item.period, item.included))}</div>
         </div>`).join("");
-      const monthlyReferences = monthlyFeeLines().map((item) => `
-        <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #e5eaf0;">
-          <span>${escapeHtml(item.name)} <small style="color:#687381;">${item.includeInAdvance ? "前賃料に含む" : "前賃料対象外"} / ${item.includeInGuarantee ? "保証料算定対象" : "保証料算定外"}</small></span>
-          <strong>${fmt(item.amount)}/月</strong>
-        </div>`).join("");
+      const monthlyReferences = monthlyCostLines().map((item) => `
+        <tr>
+          <td style="padding:11px 14px;border-bottom:1px solid #e5eaf0;font-size:16px;">
+            <strong>${escapeHtml(item.name)}</strong>
+            ${item.detail ? `<small style="display:block;margin-top:3px;color:#687381;font-size:12px;font-weight:400;">${escapeHtml(item.detail)}</small>` : ""}
+          </td>
+          <td style="padding:11px 14px;border-bottom:1px solid #e5eaf0;text-align:right;font-size:17px;font-weight:700;white-space:nowrap;">${fmt(item.amount)}/月</td>
+        </tr>`).join("");
       const rows = rowsForShare().map(([name, amount]) => `
         <tr>
           <td style="padding:10px 12px;border-bottom:1px solid #d4dbe3;font-size:17px;">${escapeHtml(name)}</td>
           <td style="padding:10px 12px;border-bottom:1px solid #d4dbe3;text-align:right;font-size:18px;font-weight:700;color:${amount < 0 ? "#b91c1c" : "#1f2933"};">${fmt(amount)}</td>
         </tr>`).join("");
       byId("shareCard").innerHTML = `
-        <div style="border:1px solid #1f2933;padding:0;background:#fff;font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sans-serif;">
+        <div class="estimate-sheet" style="border:1px solid #1f2933;padding:0;background:#fff;font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sans-serif;">
           <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding:24px 28px;background:#26313d;color:#fff;">
             <div style="min-width:0;flex:1;">
               <div style="font-size:16px;opacity:.82;">賃貸初期費用 概算書</div>
@@ -1289,7 +1331,7 @@
             </div>
             <div style="flex:0 0 auto;text-align:right;font-size:15px;opacity:.86;">作成日<br>${today}</div>
           </div>
-          <div style="padding:22px 28px 28px;">
+          <div class="estimate-content" style="padding:28px 28px 28px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">
               <div style="border:1px solid #d4dbe3;padding:14px 16px;background:#f7f9fb;">
                 <div style="font-size:14px;color:#687381;">月額合計</div>
@@ -1303,7 +1345,7 @@
             <table style="width:100%;border-collapse:collapse;border-top:2px solid #1f2933;">
               <thead>
                 <tr>
-                  <th style="padding:9px 12px;border-bottom:1px solid #1f2933;text-align:left;background:#eef2f5;font-size:14px;">項目</th>
+                  <th style="padding:10px 12px;border-bottom:1px solid #1f2933;text-align:left;background:#eef2f5;font-size:14px;">初期費用内訳</th>
                   <th style="padding:9px 12px;border-bottom:1px solid #1f2933;text-align:right;background:#eef2f5;font-size:14px;">金額</th>
                 </tr>
               </thead>
@@ -1315,12 +1357,15 @@
                 <div style="font-size:13px;line-height:1.45;">${advanceReferences}</div>
               </div>` : ""}
             ${monthlyReferences ? `
-              <div style="margin-top:16px;padding:12px 14px;border:1px solid #d4dbe3;background:#f7f9fb;">
-                <div style="font-size:14px;font-weight:700;margin-bottom:4px;">月次費用</div>
-                <div style="font-size:14px;line-height:1.45;">${monthlyReferences}</div>
+              <div style="margin-top:24px;border:1px solid #d4dbe3;background:#fff;">
+                <div style="display:flex;justify-content:space-between;gap:16px;padding:11px 14px;border-bottom:1px solid #1f2933;background:#eef2f5;font-size:14px;">
+                  <strong>月額費用内訳</strong>
+                  <strong>${fmt(monthly())}/月</strong>
+                </div>
+                <table style="width:100%;border-collapse:collapse;"><tbody>${monthlyReferences}</tbody></table>
               </div>` : ""}
             ${memo ? `<p style="margin:18px 0 0;padding:12px 14px;border-left:4px solid #0f766e;background:#f7f9fb;font-size:15px;line-height:1.55;">${escapeHtml(memo).replace(/\n/g, "<br>")}</p>` : ""}
-            <div style="display:flex;justify-content:space-between;gap:18px;margin-top:18px;padding-top:12px;border-top:1px solid #d4dbe3;color:#687381;font-size:13px;line-height:1.45;">
+            <div class="estimate-footer" style="display:flex;justify-content:space-between;gap:18px;margin-top:30px;padding-top:14px;border-top:1px solid #d4dbe3;color:#687381;font-size:13px;line-height:1.45;">
               <span>概算のため、審査内容・契約開始日・管理会社指定条件により変動する場合があります。</span>
               <span style="white-space:nowrap;">単位: 円</span>
             </div>
@@ -1356,6 +1401,15 @@
       if (value && !value.endsWith("様")) input.value = `${value}様`;
     }
 
+    function formatMoneyInputField(input) {
+      const modeId = input.dataset.moneyMode;
+      if (modeId && byId(modeId)?.value !== "amount") return;
+      const raw = input.value.trim();
+      if (!raw) return;
+      const amount = money(parseMoneyInput(raw, input.dataset.assumeMan === "true"));
+      input.value = formatMoneyInputValue(amount);
+    }
+
     function makeCanvas() {
       buildShareCard();
       const rows = rowsForShare();
@@ -1364,18 +1418,19 @@
       const start = displayContractStart();
       const memo = byId("memo").value.trim();
       const totals = calculate();
-      const monthlyLines = monthlyFeeLines();
+      const monthlyLines = monthlyCostLines();
       const advanceLines = advanceReferenceLines(totals);
       const canvas = document.createElement("canvas");
       const width = 1170;
-      const rowHeight = 56;
-      const tableTop = 356;
-      const tableHeaderHeight = 44;
+      const rowHeight = 64;
+      const tableTop = 390;
+      const tableHeaderHeight = 46;
       const advanceBlockHeight = advanceLines.length ? 86 + advanceLines.length * 54 : 0;
-      const monthlyBlockHeight = monthlyLines.length ? 92 + monthlyLines.length * 52 : 0;
-      const memoHeight = memo ? 106 : 0;
-      const footerHeight = 112;
-      const height = tableTop + tableHeaderHeight + rows.length * rowHeight + advanceBlockHeight + monthlyBlockHeight + memoHeight + footerHeight;
+      const monthlyBlockHeight = monthlyLines.length ? 90 + monthlyLines.length * 58 : 0;
+      const memoHeight = memo ? 116 : 0;
+      const footerHeight = 130;
+      const contentHeight = tableTop + tableHeaderHeight + rows.length * rowHeight + advanceBlockHeight + monthlyBlockHeight + memoHeight + footerHeight;
+      const height = Math.max(Math.round(width * 297 / 210), contentHeight);
       const scale = 2;
       canvas.width = width * scale;
       canvas.height = height * scale;
@@ -1389,7 +1444,7 @@
       ctx.lineWidth = 2;
       ctx.strokeRect(34, 34, width - 68, height - 68);
       ctx.fillStyle = "#26313d";
-      ctx.fillRect(34, 34, width - 68, 150);
+      ctx.fillRect(34, 34, width - 68, 180);
       ctx.fillStyle = "#d9e0e8";
       ctx.font = "24px -apple-system, BlinkMacSystemFont, sans-serif";
       ctx.fillText("賃貸初期費用 概算書", 70, 82);
@@ -1399,29 +1454,29 @@
       ctx.fillText(new Date().toLocaleDateString("ja-JP"), width - 70, 106);
       ctx.textAlign = "left";
       ctx.fillStyle = "#ffffff";
-      drawFittedText(ctx, property, 70, 138, width - 380, 42, 25, "bold");
+      drawFittedText(ctx, property, 70, 148, width - 380, 42, 25, "bold");
       ctx.fillStyle = "#d9e0e8";
-      drawFittedText(ctx, [customer, start ? `契約開始 ${start}` : ""].filter(Boolean).join(" / "), 70, 168, width - 380, 23, 17);
-      drawInfoBox(ctx, 70, 214, 490, "月額合計", `${fmt(monthly())}/月`, "#1f2933", "#f7f9fb", "#d4dbe3");
-      drawInfoBox(ctx, 610, 214, 490, "概算合計", fmt(totals.grand), "#0f766e", "#f0fdfa", "#0f766e");
+      drawFittedText(ctx, [customer, start ? `契約開始 ${start}` : ""].filter(Boolean).join(" / "), 70, 184, width - 380, 23, 17);
+      drawInfoBox(ctx, 70, 246, 490, "月額合計", `${fmt(monthly())}/月`, "#1f2933", "#f7f9fb", "#d4dbe3");
+      drawInfoBox(ctx, 610, 246, 490, "概算合計", fmt(totals.grand), "#0f766e", "#f0fdfa", "#0f766e");
       let y = tableTop;
       ctx.fillStyle = "#eef2f5";
-      ctx.fillRect(70, y, width - 140, 44);
+      ctx.fillRect(70, y, width - 140, tableHeaderHeight);
       ctx.strokeStyle = "#1f2933";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(70, y);
       ctx.lineTo(width - 70, y);
-      ctx.moveTo(70, y + 44);
-      ctx.lineTo(width - 70, y + 44);
+      ctx.moveTo(70, y + tableHeaderHeight);
+      ctx.lineTo(width - 70, y + tableHeaderHeight);
       ctx.stroke();
       ctx.fillStyle = "#1f2933";
       ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, sans-serif";
       ctx.textAlign = "left";
-      ctx.fillText("項目", 88, y + 29);
+      ctx.fillText("初期費用内訳", 88, y + 30);
       ctx.textAlign = "right";
-      ctx.fillText("金額", width - 88, y + 29);
-      y += 44;
+      ctx.fillText("金額", width - 88, y + 30);
+      y += tableHeaderHeight;
       rows.forEach(([name, amount]) => {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(70, y, width - 140, rowHeight);
@@ -1433,11 +1488,11 @@
         ctx.stroke();
         ctx.fillStyle = "#1f2933";
         ctx.textAlign = "left";
-        drawFittedText(ctx, name, 88, y + 37, 650, 25, 18);
+        drawFittedText(ctx, name, 88, y + 42, 650, 25, 18);
         ctx.fillStyle = amount < 0 ? "#b91c1c" : "#1f2933";
         ctx.font = "bold 27px -apple-system, BlinkMacSystemFont, sans-serif";
         ctx.textAlign = "right";
-        ctx.fillText(fmt(amount), width - 88, y + 37);
+        ctx.fillText(fmt(amount), width - 88, y + 42);
         y += rowHeight;
       });
       if (advanceLines.length) {
@@ -1468,7 +1523,7 @@
       if (monthlyLines.length) {
         y += 18;
         const blockHeight = monthlyBlockHeight - 18;
-        ctx.fillStyle = "#f7f9fb";
+        ctx.fillStyle = "#ffffff";
         ctx.fillRect(70, y, width - 140, blockHeight);
         ctx.strokeStyle = "#d4dbe3";
         ctx.lineWidth = 1;
@@ -1476,20 +1531,38 @@
         ctx.fillStyle = "#1f2933";
         ctx.font = "bold 21px -apple-system, BlinkMacSystemFont, sans-serif";
         ctx.textAlign = "left";
-        ctx.fillText("月次費用", 88, y + 32);
-        let monthlyY = y + 64;
+        ctx.fillText("月額費用内訳", 88, y + 36);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#0f766e";
+        ctx.fillText(`${fmt(monthly())}/月`, width - 88, y + 36);
+        ctx.strokeStyle = "#1f2933";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(70, y + 58);
+        ctx.lineTo(width - 70, y + 58);
+        ctx.stroke();
+        let monthlyRowTop = y + 58;
         monthlyLines.forEach((item) => {
+          const baseline = monthlyRowTop + (item.detail ? 25 : 36);
           ctx.fillStyle = "#1f2933";
           ctx.textAlign = "left";
-          drawFittedText(ctx, item.name, 88, monthlyY, 650, 20, 16, "bold");
-          ctx.font = "bold 20px -apple-system, BlinkMacSystemFont, sans-serif";
+          drawFittedText(ctx, item.name, 88, baseline, 650, 21, 16, "bold");
+          ctx.font = "bold 21px -apple-system, BlinkMacSystemFont, sans-serif";
           ctx.textAlign = "right";
-          ctx.fillText(`${fmt(item.amount)}/月`, width - 88, monthlyY);
-          ctx.fillStyle = "#687381";
-          ctx.font = "16px -apple-system, BlinkMacSystemFont, sans-serif";
-          ctx.textAlign = "left";
-          ctx.fillText(`前賃料: ${item.includeInAdvance ? "含む" : "対象外"} / 保証料: ${item.includeInGuarantee ? "算定対象" : "算定外"}`, 88, monthlyY + 23);
-          monthlyY += 52;
+          ctx.fillText(`${fmt(item.amount)}/月`, width - 88, baseline);
+          if (item.detail) {
+            ctx.fillStyle = "#687381";
+            ctx.font = "16px -apple-system, BlinkMacSystemFont, sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText(item.detail, 88, monthlyRowTop + 47);
+          }
+          ctx.strokeStyle = "#d4dbe3";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(70, monthlyRowTop + 58);
+          ctx.lineTo(width - 70, monthlyRowTop + 58);
+          ctx.stroke();
+          monthlyRowTop += 58;
         });
         y += blockHeight;
       }
@@ -1504,13 +1577,14 @@
         wrapText(ctx, memo, 94, y + 50, width - 188, 28, 2);
         y += memoHeight;
       }
+      const footerY = Math.max(y + 28, height - 100);
       ctx.fillStyle = "#687381";
       ctx.font = "19px -apple-system, BlinkMacSystemFont, sans-serif";
       ctx.textAlign = "left";
-      ctx.fillRect(70, y + 10, width - 140, 1);
-      wrapText(ctx, "概算のため、審査内容・契約開始日・管理会社指定条件により変動する場合があります。", 70, y + 48, width - 220, 26, 2);
+      ctx.fillRect(70, footerY, width - 140, 1);
+      wrapText(ctx, "概算のため、審査内容・契約開始日・管理会社指定条件により変動する場合があります。", 70, footerY + 38, width - 220, 26, 2);
       ctx.textAlign = "right";
-      ctx.fillText("単位: 円", width - 70, y + 48);
+      ctx.fillText("単位: 円", width - 70, footerY + 38);
       return canvas;
     }
 
@@ -1736,6 +1810,12 @@
     document.addEventListener("input", (event) => {
       if (event.target instanceof HTMLElement) event.target.removeAttribute("aria-invalid");
       calculate();
+    });
+    document.addEventListener("focusout", (event) => {
+      if (event.target instanceof HTMLInputElement && event.target.matches("[data-money]")) {
+        formatMoneyInputField(event.target);
+        calculate();
+      }
     });
     document.addEventListener("change", calculate);
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
