@@ -324,6 +324,48 @@
       font-weight: 800;
     }
 
+    .date-required-notice {
+      display: block;
+      width: 100%;
+      min-height: 54px;
+      border: 1px solid rgba(180, 83, 9, .42);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fff7ed;
+      color: #7c2d12;
+      text-align: left;
+      box-shadow: none;
+    }
+
+    .date-required-notice strong,
+    .date-required-notice span {
+      display: block;
+    }
+
+    .date-required-notice strong {
+      font-size: 13px;
+    }
+
+    .date-required-notice span {
+      margin-top: 3px;
+      color: #9a4b0a;
+      font-size: 11px;
+    }
+
+    .date-required-notice:focus-visible {
+      outline: none;
+      border-color: var(--accent-2);
+      box-shadow: 0 0 0 3px rgba(180, 83, 9, .14);
+    }
+
+    .advance-date-fields {
+      transition: opacity .16s ease;
+    }
+
+    .advance-date-fields.is-waiting {
+      opacity: .46;
+    }
+
     .mode-row {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -617,8 +659,12 @@
         <div class="fields">
           <div class="line-item">
             <div class="line-title">当月日割前賃料 <output id="proratedOutput">0円</output></div>
+            <button class="date-required-notice" id="advanceDatePrompt" type="button">
+              <strong>契約開始日を入力してください</strong>
+              <span>タップして入力欄へ移動</span>
+            </button>
             <div class="advance-breakdown" id="currentAdvanceBreakdown"></div>
-            <div class="grid-3">
+            <div class="grid-3 advance-date-fields" id="currentAdvanceFields">
               <label>対象日数
                 <input id="currentChargeDays" readonly value="0日">
               </label>
@@ -1089,6 +1135,9 @@
     }
 
     function syncUiState() {
+      const hasContractStartDate = Boolean(parseLocalDate(byId("contractStartDate").value));
+      setHidden("advanceDatePrompt", hasContractStartDate);
+      byId("currentAdvanceFields").classList.toggle("is-waiting", !hasContractStartDate);
       const freeMode = byId("freeRentMode").value;
       byId("freeRentValue").step = freeMode === "months" ? "0.5" : "1";
       const freeRentRule = freeMode === "months"
@@ -1668,6 +1717,11 @@
     byId("shareImage").addEventListener("click", shareImage);
     byId("saveImage").addEventListener("click", saveImage);
     byId("printPdf").addEventListener("click", printPdf);
+    byId("advanceDatePrompt").addEventListener("click", () => {
+      const contractStartDate = byId("contractStartDate");
+      contractStartDate.scrollIntoView({ behavior: "smooth", block: "center" });
+      contractStartDate.focus();
+    });
     byId("closePreview").addEventListener("click", closeImagePreview);
     byId("imagePreview").addEventListener("click", (event) => {
       if (event.target === byId("imagePreview")) closeImagePreview();
