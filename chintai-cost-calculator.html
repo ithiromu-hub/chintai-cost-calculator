@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f7f3ea">
+  <meta name="theme-color" content="#eef2f5">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="初期費用計算">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -59,13 +59,6 @@
       font-size: 26px;
       line-height: 1.15;
       letter-spacing: 0;
-    }
-
-    .subtitle {
-      margin: 6px 0 0;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.5;
     }
 
     .total-chip {
@@ -177,6 +170,23 @@
       box-shadow: 0 0 0 3px rgba(15, 118, 110, .14);
     }
 
+    input[aria-invalid="true"] {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 3px rgba(185, 28, 28, .12);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
       .line-item {
       display: grid;
       gap: 8px;
@@ -189,6 +199,87 @@
     .line-item.is-muted {
       opacity: .58;
       background: #f7f9fb;
+    }
+
+    .monthly-item {
+      padding: 0;
+    }
+
+    .monthly-summary {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto 18px;
+      gap: 10px;
+      align-items: center;
+      min-height: 58px;
+      padding: 10px;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .monthly-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .monthly-summary::after {
+      content: ">";
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1;
+      transform-origin: center;
+      transition: transform .16s ease;
+    }
+
+    .monthly-item[open] .monthly-summary::after {
+      transform: rotate(90deg);
+    }
+
+    .monthly-summary-copy {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .monthly-summary-copy > strong {
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .monthly-summary output {
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .monthly-flags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .state-pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 6px;
+      background: #f7f9fb;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .state-pill.is-on {
+      border-color: rgba(15, 118, 110, .32);
+      background: #ecfdf5;
+      color: #0f4f4a;
+    }
+
+    .monthly-edit {
+      display: grid;
+      gap: 10px;
+      padding: 0 10px 10px;
+      border-top: 1px solid #e5eaf0;
+      padding-top: 10px;
     }
 
     .line-title {
@@ -273,7 +364,26 @@
       width: 22px;
       height: 22px;
       min-height: 22px;
+      appearance: auto;
+      -webkit-appearance: checkbox;
       accent-color: var(--accent);
+    }
+
+    .toggle-copy {
+      min-width: 0;
+    }
+
+    .toggle-status {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .toggle.is-on .toggle-status,
+    .toggle:has(input:checked) .toggle-status {
+      color: #0f4f4a;
     }
 
     .actions {
@@ -296,6 +406,10 @@
       background: var(--accent);
       font-weight: 800;
       box-shadow: 0 9px 22px rgba(15, 118, 110, .22);
+    }
+
+    .actions button:disabled {
+      opacity: .64;
     }
 
     .actions button.secondary, .ghost-button {
@@ -406,8 +520,17 @@
       header { align-items: stretch; }
       h1 { font-size: 23px; }
       .total-chip { min-width: 116px; }
-      .grid-2, .grid-3, .mode-row { grid-template-columns: 1fr; }
-      .actions { grid-template-columns: 1fr; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .mode-row.compact { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+      .actions {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+      .actions button {
+        min-height: 46px;
+        padding: 9px 4px;
+        font-size: 12px;
+      }
     }
 
     @media print {
@@ -426,7 +549,6 @@
     <header>
       <div>
         <h1>賃貸初期費用計算</h1>
-        <p class="subtitle">店頭・内見先で概算を作り、画像またはPDFでそのまま共有できます。</p>
       </div>
       <div class="total-chip">
         <span>概算合計</span>
@@ -443,7 +565,7 @@
         <div class="fields">
           <div class="grid-2">
             <label>物件名
-              <input id="propertyName" placeholder="例: サンプルマンション">
+              <input id="propertyName" required placeholder="例: サンプルマンション">
             </label>
             <label>号室
               <input id="roomNumber" placeholder="例: 203">
@@ -454,12 +576,12 @@
               <input id="customerName" placeholder="例: 山田様">
             </label>
             <label>契約開始日
-              <input id="contractStartDate" type="date">
+              <input id="contractStartDate" type="date" required>
             </label>
           </div>
           <div class="grid-2">
             <label>賃料
-              <input id="rent" type="number" inputmode="numeric" min="0" placeholder="120000">
+              <input id="rent" type="number" inputmode="numeric" min="0" required placeholder="120000">
             </label>
             <label>管理費・共益費
               <input id="management" type="number" inputmode="numeric" min="0" placeholder="10000">
@@ -577,9 +699,10 @@
   </div>
 
   <div id="shareCard"></div>
-  <div class="toast" id="toast"></div>
-  <div class="preview-sheet" id="imagePreview">
-    <div class="preview-panel">
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="preview-sheet" id="imagePreview" role="dialog" aria-modal="true" aria-labelledby="previewTitle" aria-hidden="true">
+    <div class="preview-panel" tabindex="-1">
+      <h2 class="sr-only" id="previewTitle">共有画像プレビュー</h2>
       <div class="preview-actions">
         <a id="previewDownload" href="#" download="賃貸初期費用概算.png">画像を保存</a>
         <button id="closePreview" type="button">閉じる</button>
@@ -617,6 +740,7 @@
       { label: "24時間サポート", value: "", mode: "amount", includeInAdvance: true, includeInGuarantee: true }
     ];
     const extraDefaults = [];
+    let previewReturnFocus = null;
 
     function makeLineItem(def) {
       const { id, label, type, mode = "amount", value = "" } = def;
@@ -710,36 +834,48 @@
 
     function makeMonthlyItem(index, label = "", value = "", includeInAdvance = true, includeInGuarantee = true, mode = "amount") {
       const id = `monthly${index}`;
-      const wrap = document.createElement("div");
-      wrap.className = "line-item";
+      const wrap = document.createElement("details");
+      wrap.className = "line-item monthly-item";
       wrap.dataset.monthly = id;
-      wrap.dataset.includeGuarantee = includeInGuarantee ? "1" : "0";
       const isFlexible = mode === "percent" || label === "月次保証料";
       wrap.innerHTML = `
-        <div class="line-title"><span id="${id}Title">月次費用</span><output id="${id}Output">0円/月</output></div>
-        <div class="grid-2">
-          <label>項目名
-            <input id="${id}Name" value="${label}" placeholder="例: 町会費">
+        <summary class="monthly-summary">
+          <span class="monthly-summary-copy">
+            <strong id="${id}Title">${label || "月次費用"}</strong>
+            <span class="monthly-flags">
+              <span class="state-pill" id="${id}AdvanceState"></span>
+              <span class="state-pill" id="${id}GuaranteeState"></span>
+            </span>
+          </span>
+          <output id="${id}Output">0円/月</output>
+        </summary>
+        <div class="monthly-edit">
+          <div class="grid-2">
+            <label>項目名
+              <input id="${id}Name" value="${label}" placeholder="例: 町会費">
+            </label>
+            <label>${isFlexible ? "数値" : "月額"}
+              <input id="${id}Value" type="number" inputmode="decimal" min="0" step="0.01" value="${value}" placeholder="0">
+            </label>
+          </div>
+          ${isFlexible ? `
+            <label>指定方法
+              <select id="${id}Mode">
+                <option value="percent">総賃料%</option>
+                <option value="amount">金額指定</option>
+              </select>
+            </label>` : `<input id="${id}Mode" type="hidden" value="amount">`}
+          <label class="toggle">
+            <input id="${id}IncludeAdvance" type="checkbox" ${includeInAdvance ? "checked" : ""}>
+            <span class="toggle-copy">前賃料に含める</span>
+            <strong class="toggle-status" id="${id}AdvanceToggleState"></strong>
           </label>
-          <label>${isFlexible ? "数値" : "月額"}
-            <input id="${id}Value" type="number" inputmode="decimal" min="0" step="0.01" value="${value}" placeholder="0">
+          <label class="toggle">
+            <input id="${id}IncludeGuarantee" type="checkbox" ${includeInGuarantee ? "checked" : ""}>
+            <span class="toggle-copy">初回保証料の算定に含める</span>
+            <strong class="toggle-status" id="${id}GuaranteeToggleState"></strong>
           </label>
-        </div>
-        ${isFlexible ? `
-          <label>指定方法
-            <select id="${id}Mode">
-              <option value="percent">総賃料%</option>
-              <option value="amount">金額指定</option>
-            </select>
-          </label>` : `<input id="${id}Mode" type="hidden" value="amount">`}
-        <label class="toggle">
-          <input id="${id}IncludeAdvance" type="checkbox" ${includeInAdvance ? "checked" : ""}>
-          前賃料に含める
-        </label>
-        <label class="toggle">
-          <input id="${id}IncludeGuarantee" type="checkbox" ${includeInGuarantee ? "checked" : ""}>
-          初回保証料の算定に含める
-        </label>`;
+        </div>`;
       wrap.querySelector(`#${id}Mode`).value = mode;
       return wrap;
     }
@@ -842,7 +978,6 @@
       }
       const freeMgmt = byId("freeRentTarget").value === "rentManagement";
       let gross = 0;
-      let charged = 0;
       let free = 0;
       for (let day = new Date(start); day <= end; day = addDays(day, 1)) {
         const dailyRent = rent() / daysIn(day);
@@ -852,16 +987,16 @@
         const isFree = freeEnd && day < freeEnd;
         if (isFree) {
           free += dailyRent + (freeMgmt ? dailyManagement : 0);
-          charged += (freeMgmt ? 0 : dailyManagement) + dailyIncludedMonthly;
-        } else {
-          charged += dailyRent + dailyManagement + dailyIncludedMonthly;
         }
       }
+      const roundedGross = money(gross);
+      const roundedFree = Math.min(roundedGross, money(free));
+      const roundedCharged = roundedGross - roundedFree;
       return {
-        amount: money(charged),
-        gross: money(gross),
-        free: money(free),
-        charged: money(charged),
+        amount: roundedCharged,
+        gross: roundedGross,
+        free: roundedFree,
+        charged: roundedCharged,
         days: Math.round((end - start) / 86400000) + 1,
         label: monthLabel(start)
       };
@@ -903,6 +1038,23 @@
       return byId("freeRentTarget").value === "rentManagement" ? "賃料+管理費" : "賃料のみ";
     }
 
+    function formatShortDate(date) {
+      return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+    }
+
+    function freeRentPeriodLabel() {
+      const start = parseLocalDate(byId("contractStartDate").value);
+      const days = freeRentDays(start);
+      if (!start || days <= 0) return "";
+      const end = addDays(start, days - 1);
+      return `${formatShortDate(start)}〜${formatShortDate(end)}（${days}日間）`;
+    }
+
+    function freeRentShareLabel() {
+      const period = freeRentPeriodLabel();
+      return period ? `フリーレント: ${freeRentTargetLabel()} / ${period}` : `フリーレント: ${freeRentTargetLabel()}`;
+    }
+
     function advanceBreakdownHtml(period, included = true) {
       const chargeLabel = included ? "請求額" : "参考請求額";
       const chargeAmount = included ? period.amount : period.referenceAmount;
@@ -939,13 +1091,23 @@
     function syncUiState() {
       const freeMode = byId("freeRentMode").value;
       byId("freeRentValue").step = freeMode === "months" ? "0.5" : "1";
-      byId("freeRentNote").textContent = freeMode === "months"
+      const freeRentRule = freeMode === "months"
         ? `${freeRentTargetLabel()}を対象に、契約開始月の日数を基準に無料日数へ換算します。`
         : `${freeRentTargetLabel()}を対象に、契約開始日から指定日数分を無料として計算します。`;
+      const freeRentPeriod = freeRentPeriodLabel();
+      byId("freeRentNote").textContent = `${freeRentRule}${freeRentPeriod ? ` 無料期間: ${freeRentPeriod}` : ""}`;
       monthlyRows().forEach((row) => {
         const id = row.dataset.monthly;
-        const includedSomewhere = byId(`${id}IncludeAdvance`).checked || byId(`${id}IncludeGuarantee`).checked;
-        row.classList.toggle("is-muted", !includedSomewhere);
+        const includeInAdvance = byId(`${id}IncludeAdvance`).checked;
+        const includeInGuarantee = byId(`${id}IncludeGuarantee`).checked;
+        const advanceState = byId(`${id}AdvanceState`);
+        const guaranteeState = byId(`${id}GuaranteeState`);
+        advanceState.textContent = includeInAdvance ? "前賃料: 含む" : "前賃料: 対象外";
+        guaranteeState.textContent = includeInGuarantee ? "保証料: 算定対象" : "保証料: 算定外";
+        advanceState.classList.toggle("is-on", includeInAdvance);
+        guaranteeState.classList.toggle("is-on", includeInGuarantee);
+        byId(`${id}AdvanceToggleState`).textContent = includeInAdvance ? "含む" : "含めない";
+        byId(`${id}GuaranteeToggleState`).textContent = includeInGuarantee ? "算定対象" : "算定外";
       });
       byId("includeNextMonth").closest(".line-item").classList.toggle("is-muted", !byId("includeNextMonth").checked);
       byId("includeMonthAfter").closest(".line-item").classList.toggle("is-muted", !byId("includeMonthAfter").checked);
@@ -1047,7 +1209,7 @@
       const totals = calculate();
       const property = displayProperty();
       const customer = displayCustomerName();
-      const start = byId("contractStartDate").value;
+      const start = displayContractStart();
       const memo = byId("memo").value.trim();
       const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
       const advanceReferences = advanceReferenceLines(totals).map((item) => `
@@ -1071,12 +1233,12 @@
       byId("shareCard").innerHTML = `
         <div style="border:1px solid #1f2933;padding:0;background:#fff;font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sans-serif;">
           <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding:24px 28px;background:#26313d;color:#fff;">
-            <div>
+            <div style="min-width:0;flex:1;">
               <div style="font-size:16px;opacity:.82;">賃貸初期費用 概算書</div>
-              <h1 style="font-size:31px;margin:8px 0 0;line-height:1.25;">${escapeHtml(property)}</h1>
+              <h1 style="font-size:31px;margin:8px 0 0;line-height:1.25;overflow-wrap:anywhere;">${escapeHtml(property)}</h1>
               <div style="font-size:16px;opacity:.88;margin-top:8px;">${escapeHtml([customer, start ? `契約開始 ${start}` : ""].filter(Boolean).join(" / "))}</div>
             </div>
-            <div style="text-align:right;font-size:15px;opacity:.86;">作成日<br>${today}</div>
+            <div style="flex:0 0 auto;text-align:right;font-size:15px;opacity:.86;">作成日<br>${today}</div>
           </div>
           <div style="padding:22px 28px 28px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">
@@ -1100,7 +1262,7 @@
             </table>
             ${advanceReferences ? `
               <div style="margin-top:16px;padding:12px 14px;border:1px solid #d4dbe3;background:#ffffff;">
-                <div style="font-size:14px;font-weight:700;margin-bottom:4px;">前賃料内訳（フリーレント: ${escapeHtml(freeRentTargetLabel())}）</div>
+                <div style="font-size:14px;font-weight:700;margin-bottom:4px;">前賃料内訳（${escapeHtml(freeRentShareLabel())}）</div>
                 <div style="font-size:13px;line-height:1.45;">${advanceReferences}</div>
               </div>` : ""}
             ${monthlyReferences ? `
@@ -1127,6 +1289,12 @@
       return [property || "物件名未入力", room].filter(Boolean).join(" ");
     }
 
+    function displayContractStart() {
+      const date = parseLocalDate(byId("contractStartDate").value);
+      if (!date) return "";
+      return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+    }
+
     function displayCustomerName() {
       const value = byId("customerName").value.trim();
       if (!value) return "";
@@ -1144,7 +1312,7 @@
       const rows = rowsForShare();
       const property = displayProperty();
       const customer = displayCustomerName();
-      const start = byId("contractStartDate").value;
+      const start = displayContractStart();
       const memo = byId("memo").value.trim();
       const totals = calculate();
       const monthlyLines = monthlyFeeLines();
@@ -1155,7 +1323,7 @@
       const tableTop = 356;
       const tableHeaderHeight = 44;
       const advanceBlockHeight = advanceLines.length ? 86 + advanceLines.length * 54 : 0;
-      const monthlyBlockHeight = monthlyLines.length ? 90 + monthlyLines.length * 34 : 0;
+      const monthlyBlockHeight = monthlyLines.length ? 92 + monthlyLines.length * 52 : 0;
       const memoHeight = memo ? 106 : 0;
       const footerHeight = 112;
       const height = tableTop + tableHeaderHeight + rows.length * rowHeight + advanceBlockHeight + monthlyBlockHeight + memoHeight + footerHeight;
@@ -1182,11 +1350,9 @@
       ctx.fillText(new Date().toLocaleDateString("ja-JP"), width - 70, 106);
       ctx.textAlign = "left";
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 42px -apple-system, BlinkMacSystemFont, sans-serif";
-      wrapText(ctx, property, 70, 132, width - 250, 46, 2);
+      drawFittedText(ctx, property, 70, 138, width - 380, 42, 25, "bold");
       ctx.fillStyle = "#d9e0e8";
-      ctx.font = "23px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText([customer, start ? `契約開始 ${start}` : ""].filter(Boolean).join(" / "), 70, 164);
+      drawFittedText(ctx, [customer, start ? `契約開始 ${start}` : ""].filter(Boolean).join(" / "), 70, 168, width - 380, 23, 17);
       drawInfoBox(ctx, 70, 214, 490, "月額合計", `${fmt(monthly())}/月`, "#1f2933", "#f7f9fb", "#d4dbe3");
       drawInfoBox(ctx, 610, 214, 490, "概算合計", fmt(totals.grand), "#0f766e", "#f0fdfa", "#0f766e");
       let y = tableTop;
@@ -1217,9 +1383,8 @@
         ctx.lineTo(width - 70, y + rowHeight);
         ctx.stroke();
         ctx.fillStyle = "#1f2933";
-        ctx.font = "25px -apple-system, BlinkMacSystemFont, sans-serif";
         ctx.textAlign = "left";
-        ctx.fillText(name, 88, y + 37);
+        drawFittedText(ctx, name, 88, y + 37, 650, 25, 18);
         ctx.fillStyle = amount < 0 ? "#b91c1c" : "#1f2933";
         ctx.font = "bold 27px -apple-system, BlinkMacSystemFont, sans-serif";
         ctx.textAlign = "right";
@@ -1237,7 +1402,7 @@
         ctx.fillStyle = "#1f2933";
         ctx.font = "bold 21px -apple-system, BlinkMacSystemFont, sans-serif";
         ctx.textAlign = "left";
-        ctx.fillText(`前賃料内訳（フリーレント: ${freeRentTargetLabel()}）`, 88, y + 32);
+        drawFittedText(ctx, `前賃料内訳（${freeRentShareLabel()}）`, 88, y + 32, width - 176, 21, 15, "bold");
         let advanceY = y + 68;
         advanceLines.forEach((item) => {
           ctx.fillStyle = "#1f2933";
@@ -1249,7 +1414,7 @@
           ctx.fillText(advanceBreakdownText(item.period, item.included), 88, advanceY + 26);
           advanceY += 54;
         });
-        y += advanceBlockHeight;
+        y += blockHeight;
       }
       if (monthlyLines.length) {
         y += 18;
@@ -1263,18 +1428,21 @@
         ctx.font = "bold 21px -apple-system, BlinkMacSystemFont, sans-serif";
         ctx.textAlign = "left";
         ctx.fillText("月次費用", 88, y + 32);
-        let monthlyY = y + 68;
+        let monthlyY = y + 64;
         monthlyLines.forEach((item) => {
           ctx.fillStyle = "#1f2933";
-          ctx.font = "19px -apple-system, BlinkMacSystemFont, sans-serif";
           ctx.textAlign = "left";
-          ctx.fillText(`${item.name}（${item.includeInAdvance ? "前賃料に含む" : "前賃料対象外"} / ${item.includeInGuarantee ? "保証料算定対象" : "保証料算定外"}）`, 88, monthlyY);
+          drawFittedText(ctx, item.name, 88, monthlyY, 650, 20, 16, "bold");
           ctx.font = "bold 20px -apple-system, BlinkMacSystemFont, sans-serif";
           ctx.textAlign = "right";
           ctx.fillText(`${fmt(item.amount)}/月`, width - 88, monthlyY);
-          monthlyY += 34;
+          ctx.fillStyle = "#687381";
+          ctx.font = "16px -apple-system, BlinkMacSystemFont, sans-serif";
+          ctx.textAlign = "left";
+          ctx.fillText(`前賃料: ${item.includeInAdvance ? "含む" : "対象外"} / 保証料: ${item.includeInGuarantee ? "算定対象" : "算定外"}`, 88, monthlyY + 23);
+          monthlyY += 52;
         });
-        y += monthlyBlockHeight;
+        y += blockHeight;
       }
       if (memo) {
         ctx.textAlign = "left";
@@ -1321,23 +1489,45 @@
       ctx.closePath();
     }
 
+    function truncateText(ctx, text, maxWidth) {
+      const value = String(text);
+      if (ctx.measureText(value).width <= maxWidth) return value;
+      let shortened = value;
+      while (shortened.length > 1 && ctx.measureText(`${shortened}…`).width > maxWidth) {
+        shortened = shortened.slice(0, -1);
+      }
+      return `${shortened}…`;
+    }
+
+    function drawFittedText(ctx, text, x, y, maxWidth, maxSize, minSize, weight = "normal") {
+      let size = maxSize;
+      do {
+        ctx.font = `${weight} ${size}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        if (ctx.measureText(String(text)).width <= maxWidth) break;
+        size -= 1;
+      } while (size >= minSize);
+      ctx.fillText(truncateText(ctx, text, maxWidth), x, y);
+    }
+
     function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 3) {
       const chars = String(text).split("");
+      const lines = [];
       let line = "";
-      let lines = 0;
       for (let i = 0; i < chars.length; i++) {
         const test = line + chars[i];
         if (ctx.measureText(test).width > maxWidth && line) {
-          ctx.fillText(line, x, y);
-          y += lineHeight;
-          lines += 1;
+          lines.push(line);
           line = chars[i];
-          if (lines >= maxLines - 1) break;
+          if (lines.length >= maxLines - 1) {
+            line = truncateText(ctx, line + chars.slice(i + 1).join(""), maxWidth);
+            break;
+          }
         } else {
           line = test;
         }
       }
-      ctx.fillText(line, x, y);
+      if (line && lines.length < maxLines) lines.push(line);
+      lines.slice(0, maxLines).forEach((value, index) => ctx.fillText(value, x, y + index * lineHeight));
     }
 
     function dataUrlToBlob(dataUrl) {
@@ -1357,7 +1547,24 @@
       return { dataUrl, blob, file };
     }
 
+    function validateForExport() {
+      const fields = [
+        { id: "propertyName", label: "物件名", valid: (input) => input.value.trim().length > 0 },
+        { id: "contractStartDate", label: "契約開始日", valid: (input) => Boolean(input.value) },
+        { id: "rent", label: "賃料", valid: () => rent() > 0 }
+      ];
+      const invalid = fields.filter((item) => !item.valid(byId(item.id)));
+      fields.forEach((item) => byId(item.id).setAttribute("aria-invalid", invalid.some((entry) => entry.id === item.id) ? "true" : "false"));
+      if (!invalid.length) return true;
+      const first = byId(invalid[0].id);
+      first.focus();
+      first.scrollIntoView({ behavior: "smooth", block: "center" });
+      showToast(`${invalid.map((item) => item.label).join("・")}を入力してから出力してください。`);
+      return false;
+    }
+
     async function shareImage() {
+      if (!validateForExport()) return;
       const button = byId("shareImage");
       button.disabled = true;
       button.textContent = "作成中...";
@@ -1385,6 +1592,7 @@
     }
 
     async function saveImage() {
+      if (!validateForExport()) return;
       const button = byId("saveImage");
       button.disabled = true;
       button.textContent = "作成中...";
@@ -1409,13 +1617,26 @@
     }
 
     function showImagePreview(dataUrl, filename) {
+      previewReturnFocus = document.activeElement;
       byId("previewImage").src = dataUrl;
       byId("previewDownload").href = dataUrl;
       byId("previewDownload").download = filename;
-      byId("imagePreview").classList.add("show");
+      const preview = byId("imagePreview");
+      preview.classList.add("show");
+      preview.setAttribute("aria-hidden", "false");
+      byId("closePreview").focus();
+    }
+
+    function closeImagePreview() {
+      const preview = byId("imagePreview");
+      preview.classList.remove("show");
+      preview.setAttribute("aria-hidden", "true");
+      if (previewReturnFocus instanceof HTMLElement) previewReturnFocus.focus();
+      previewReturnFocus = null;
     }
 
     function printPdf() {
+      if (!validateForExport()) return;
       buildShareCard();
       window.print();
     }
@@ -1434,8 +1655,11 @@
     contractDefs.forEach((def) => byId("contractItems").appendChild(makeLineItem(def)));
     extraDefaults.forEach(([label, value], index) => byId("extraItems").appendChild(makeExtraItem(index, label, value)));
     byId("addMonthly").addEventListener("click", () => {
-      byId("monthlyItems").appendChild(makeMonthlyItem(monthlyRows().length, "", "", true));
+      const item = makeMonthlyItem(monthlyRows().length, "", "", true);
+      item.open = true;
+      byId("monthlyItems").appendChild(item);
       calculate();
+      item.querySelector("input").focus();
     });
     byId("addExtra").addEventListener("click", () => {
       byId("extraItems").appendChild(makeExtraItem(extraRows().length, "", ""));
@@ -1444,12 +1668,21 @@
     byId("shareImage").addEventListener("click", shareImage);
     byId("saveImage").addEventListener("click", saveImage);
     byId("printPdf").addEventListener("click", printPdf);
-    byId("closePreview").addEventListener("click", () => byId("imagePreview").classList.remove("show"));
+    byId("closePreview").addEventListener("click", closeImagePreview);
+    byId("imagePreview").addEventListener("click", (event) => {
+      if (event.target === byId("imagePreview")) closeImagePreview();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && byId("imagePreview").classList.contains("show")) closeImagePreview();
+    });
     byId("customerName").addEventListener("blur", () => {
       normalizeCustomerName();
       calculate();
     });
-    document.addEventListener("input", calculate);
+    document.addEventListener("input", (event) => {
+      if (event.target instanceof HTMLElement) event.target.removeAttribute("aria-invalid");
+      calculate();
+    });
     document.addEventListener("change", calculate);
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
       navigator.serviceWorker.register("./service-worker.js").catch(() => {});
