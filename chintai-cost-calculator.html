@@ -576,26 +576,32 @@
     }
 
     @media print {
-      @page { size: A4 portrait; margin: 12mm; }
+      @page { size: A4 portrait; margin: 0; }
+      html, body {
+        width: 210mm;
+        height: 297mm;
+      }
       body { background: #fff; }
-      .app > header, .app > main, .actions, .toast { display: none; }
+      .app > header, .app > main, .actions, .toast, .preview-sheet { display: none !important; }
       #shareCard {
         position: static;
-        width: auto;
+        width: 210mm;
+        height: 297mm;
         padding: 0;
+        overflow: hidden;
       }
-      #shareCard .estimate-sheet {
+      #shareCard .print-sheet {
         display: flex;
-        min-height: 273mm;
-        flex-direction: column;
+        width: 210mm;
+        height: 297mm;
+        align-items: center;
+        justify-content: center;
       }
-      #shareCard .estimate-content {
-        display: flex;
-        flex: 1;
-        flex-direction: column;
-      }
-      #shareCard .estimate-footer {
-        margin-top: auto !important;
+      #shareCard .print-sheet img {
+        display: block;
+        width: 210mm;
+        height: 297mm;
+        object-fit: contain;
       }
     }
   </style>
@@ -807,7 +813,7 @@
     ];
     const monthlyDefaults = [
       { label: "口座振替事務手数料", value: "", mode: "amount", includeInAdvance: false, includeInGuarantee: false },
-      { label: "月次保証料", value: "1", mode: "percent", includeInAdvance: false, includeInGuarantee: false },
+      { label: "月次保証料", value: "", mode: "percent", includeInAdvance: false, includeInGuarantee: false },
       { label: "町会費", value: "", mode: "amount", includeInAdvance: true, includeInGuarantee: true },
       { label: "火災保険料", value: "", mode: "amount", includeInAdvance: true, includeInGuarantee: true },
       { label: "24時間サポート", value: "", mode: "amount", includeInAdvance: true, includeInGuarantee: true }
@@ -916,6 +922,7 @@
           <span class="monthly-summary-copy">
             <strong id="${id}Title">${label || "月次費用"}</strong>
             <span class="monthly-flags">
+              ${label === "月次保証料" ? `<span class="state-pill">任意設定</span>` : ""}
               <span class="state-pill" id="${id}AdvanceState"></span>
               <span class="state-pill" id="${id}GuaranteeState"></span>
             </span>
@@ -1210,8 +1217,9 @@
       byId("monthlyFeesTotal").textContent = `${fmt(monthlyFeesTotal())}/月`;
       monthlyRows().forEach((row) => {
         const id = row.dataset.monthly;
+        const amount = monthlyFeeAmount(row);
         byId(`${id}Title`).textContent = byId(`${id}Name`).value.trim() || "月次費用";
-        byId(`${id}Output`).textContent = `${fmt(monthlyFeeAmount(row))}/月`;
+        byId(`${id}Output`).textContent = amount > 0 ? `${fmt(amount)}/月` : "未設定";
       });
       let contractTotal = 0;
       contractDefs.forEach((def) => {
@@ -1293,90 +1301,6 @@
       return def.label;
     }
 
-    function buildShareCard() {
-      const totals = calculate();
-      const property = displayProperty();
-      const customer = displayCustomerName();
-      const start = displayContractStart();
-      const memo = byId("memo").value.trim();
-      const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
-      const advanceReferences = advanceReferenceLines(totals).map((item) => `
-        <div style="padding:6px 0;border-bottom:1px solid #e5eaf0;">
-          <div style="display:flex;justify-content:space-between;gap:12px;">
-            <strong>${escapeHtml(item.label)}</strong>
-            <span>${item.included ? "請求に含む" : "請求対象外"}</span>
-          </div>
-          <div style="color:#687381;margin-top:2px;">${escapeHtml(advanceBreakdownText(item.period, item.included))}</div>
-        </div>`).join("");
-      const monthlyReferences = monthlyCostLines().map((item) => `
-        <tr>
-          <td style="padding:11px 14px;border-bottom:1px solid #e5eaf0;font-size:16px;">
-            <strong>${escapeHtml(item.name)}</strong>
-            ${item.detail ? `<small style="display:block;margin-top:3px;color:#687381;font-size:12px;font-weight:400;">${escapeHtml(item.detail)}</small>` : ""}
-          </td>
-          <td style="padding:11px 14px;border-bottom:1px solid #e5eaf0;text-align:right;font-size:17px;font-weight:700;white-space:nowrap;">${fmt(item.amount)}/月</td>
-        </tr>`).join("");
-      const rows = rowsForShare().map(([name, amount]) => `
-        <tr>
-          <td style="padding:10px 12px;border-bottom:1px solid #d4dbe3;font-size:17px;">${escapeHtml(name)}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #d4dbe3;text-align:right;font-size:18px;font-weight:700;color:${amount < 0 ? "#b91c1c" : "#1f2933"};">${fmt(amount)}</td>
-        </tr>`).join("");
-      byId("shareCard").innerHTML = `
-        <div class="estimate-sheet" style="border:1px solid #1f2933;padding:0;background:#fff;font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sans-serif;">
-          <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding:24px 28px;background:#26313d;color:#fff;">
-            <div style="min-width:0;flex:1;">
-              <div style="font-size:16px;opacity:.82;">賃貸初期費用 概算書</div>
-              <h1 style="font-size:31px;margin:8px 0 0;line-height:1.25;overflow-wrap:anywhere;">${escapeHtml(property)}</h1>
-              <div style="font-size:16px;opacity:.88;margin-top:8px;">${escapeHtml([customer, start ? `契約開始 ${start}` : ""].filter(Boolean).join(" / "))}</div>
-            </div>
-            <div style="flex:0 0 auto;text-align:right;font-size:15px;opacity:.86;">作成日<br>${today}</div>
-          </div>
-          <div class="estimate-content" style="padding:28px 28px 28px;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">
-              <div style="border:1px solid #d4dbe3;padding:14px 16px;background:#f7f9fb;">
-                <div style="font-size:14px;color:#687381;">月額合計</div>
-                <strong style="display:block;margin-top:4px;font-size:24px;color:#1f2933;">${fmt(monthly())}/月</strong>
-              </div>
-              <div style="border:2px solid #0f766e;padding:13px 16px;background:#f0fdfa;">
-                <div style="font-size:14px;color:#0f766e;">概算合計</div>
-                <strong style="display:block;margin-top:4px;font-size:29px;color:#0f766e;">${fmt(totals.grand)}</strong>
-              </div>
-            </div>
-            <table style="width:100%;border-collapse:collapse;border-top:2px solid #1f2933;">
-              <thead>
-                <tr>
-                  <th style="padding:10px 12px;border-bottom:1px solid #1f2933;text-align:left;background:#eef2f5;font-size:14px;">初期費用内訳</th>
-                  <th style="padding:9px 12px;border-bottom:1px solid #1f2933;text-align:right;background:#eef2f5;font-size:14px;">金額</th>
-                </tr>
-              </thead>
-              <tbody>${rows}</tbody>
-            </table>
-            ${advanceReferences ? `
-              <div style="margin-top:16px;padding:12px 14px;border:1px solid #d4dbe3;background:#ffffff;">
-                <div style="font-size:14px;font-weight:700;margin-bottom:4px;">前賃料内訳（${escapeHtml(freeRentShareLabel())}）</div>
-                <div style="font-size:13px;line-height:1.45;">${advanceReferences}</div>
-              </div>` : ""}
-            ${monthlyReferences ? `
-              <div style="margin-top:24px;border:1px solid #d4dbe3;background:#fff;">
-                <div style="display:flex;justify-content:space-between;gap:16px;padding:11px 14px;border-bottom:1px solid #1f2933;background:#eef2f5;font-size:14px;">
-                  <strong>月額費用内訳</strong>
-                  <strong>${fmt(monthly())}/月</strong>
-                </div>
-                <table style="width:100%;border-collapse:collapse;"><tbody>${monthlyReferences}</tbody></table>
-              </div>` : ""}
-            ${memo ? `<p style="margin:18px 0 0;padding:12px 14px;border-left:4px solid #0f766e;background:#f7f9fb;font-size:15px;line-height:1.55;">${escapeHtml(memo).replace(/\n/g, "<br>")}</p>` : ""}
-            <div class="estimate-footer" style="display:flex;justify-content:space-between;gap:18px;margin-top:30px;padding-top:14px;border-top:1px solid #d4dbe3;color:#687381;font-size:13px;line-height:1.45;">
-              <span>概算のため、審査内容・契約開始日・管理会社指定条件により変動する場合があります。</span>
-              <span style="white-space:nowrap;">単位: 円</span>
-            </div>
-          </div>
-        </div>`;
-    }
-
-    function escapeHtml(value) {
-      return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
-    }
-
     function displayProperty() {
       const property = byId("propertyName").value.trim();
       const room = byId("roomNumber").value.trim();
@@ -1411,7 +1335,6 @@
     }
 
     function makeCanvas() {
-      buildShareCard();
       const rows = rowsForShare();
       const property = displayProperty();
       const customer = displayCustomerName();
@@ -1423,13 +1346,14 @@
       const canvas = document.createElement("canvas");
       const width = 1170;
       const rowHeight = 64;
-      const tableTop = 390;
+      const contentTop = 390;
       const tableHeaderHeight = 46;
       const advanceBlockHeight = advanceLines.length ? 86 + advanceLines.length * 54 : 0;
-      const monthlyBlockHeight = monthlyLines.length ? 90 + monthlyLines.length * 58 : 0;
+      const monthlyBlockHeight = monthlyLines.length ? 72 + monthlyLines.length * 58 : 0;
+      const tableTop = contentTop + monthlyBlockHeight + (monthlyLines.length ? 28 : 0);
       const memoHeight = memo ? 116 : 0;
       const footerHeight = 130;
-      const contentHeight = tableTop + tableHeaderHeight + rows.length * rowHeight + advanceBlockHeight + monthlyBlockHeight + memoHeight + footerHeight;
+      const contentHeight = tableTop + tableHeaderHeight + rows.length * rowHeight + advanceBlockHeight + memoHeight + footerHeight;
       const height = Math.max(Math.round(width * 297 / 210), contentHeight);
       const scale = 2;
       canvas.width = width * scale;
@@ -1438,58 +1362,103 @@
       canvas.style.height = `${height}px`;
       const ctx = canvas.getContext("2d");
       ctx.scale(scale, scale);
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = "#fffefa";
       ctx.fillRect(0, 0, width, height);
-      ctx.strokeStyle = "#1f2933";
+      ctx.strokeStyle = "#343431";
       ctx.lineWidth = 2;
       ctx.strokeRect(34, 34, width - 68, height - 68);
-      ctx.fillStyle = "#26313d";
-      ctx.fillRect(34, 34, width - 68, 180);
-      ctx.fillStyle = "#d9e0e8";
-      ctx.font = "24px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText("賃貸初期費用 概算書", 70, 82);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(42, 42, width - 84, height - 84);
+      ctx.fillStyle = "#262622";
+      ctx.textAlign = "center";
+      ctx.font = "bold 38px 'Yu Mincho', 'Hiragino Mincho ProN', serif";
+      ctx.fillText("賃貸初期費用 概算書", width / 2, 90);
       ctx.textAlign = "right";
-      ctx.font = "21px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText("作成日", width - 70, 76);
-      ctx.fillText(new Date().toLocaleDateString("ja-JP"), width - 70, 106);
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#ffffff";
-      drawFittedText(ctx, property, 70, 148, width - 380, 42, 25, "bold");
-      ctx.fillStyle = "#d9e0e8";
-      drawFittedText(ctx, [customer, start ? `契約開始 ${start}` : ""].filter(Boolean).join(" / "), 70, 184, width - 380, 23, 17);
-      drawInfoBox(ctx, 70, 246, 490, "月額合計", `${fmt(monthly())}/月`, "#1f2933", "#f7f9fb", "#d4dbe3");
-      drawInfoBox(ctx, 610, 246, 490, "概算合計", fmt(totals.grand), "#0f766e", "#f0fdfa", "#0f766e");
-      let y = tableTop;
-      ctx.fillStyle = "#eef2f5";
-      ctx.fillRect(70, y, width - 140, tableHeaderHeight);
-      ctx.strokeStyle = "#1f2933";
+      ctx.font = "18px 'Yu Mincho', 'Hiragino Mincho ProN', serif";
+      ctx.fillText("作成日", width - 70, 70);
+      ctx.fillText(new Date().toLocaleDateString("ja-JP"), width - 70, 96);
+      ctx.strokeStyle = "#4b4b46";
       ctx.lineWidth = 2;
+      ctx.fillRect(70, 116, width - 140, 2);
+      ctx.lineWidth = 1;
+      ctx.fillRect(70, 122, width - 140, 1);
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#262622";
+      drawFittedText(ctx, property, 70, 166, width - 380, 39, 24, "bold", "'Yu Mincho', 'Hiragino Mincho ProN', serif");
+      ctx.fillStyle = "#4b4b46";
+      drawFittedText(ctx, [customer, start ? `契約開始 ${start}` : ""].filter(Boolean).join(" / "), 70, 200, width - 380, 21, 16);
+      drawInfoBox(ctx, 70, 246, 490, "月額合計", `${fmt(monthly())}/月`, "#262622", "#f4f2ec", "#6b6a64");
+      drawInfoBox(ctx, 610, 246, 490, "初期費用概算", fmt(totals.grand), "#7a2525", "#f7f2ef", "#7a2525");
+
+      if (monthlyLines.length) {
+        let monthlyY = contentTop;
+        ctx.fillStyle = "#edeae3";
+        ctx.fillRect(70, monthlyY, width - 140, 58);
+        ctx.strokeStyle = "#4b4b46";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(70, monthlyY, width - 140, monthlyBlockHeight);
+        ctx.fillStyle = "#262622";
+        ctx.font = "bold 22px 'Yu Mincho', 'Hiragino Mincho ProN', serif";
+        ctx.textAlign = "left";
+        ctx.fillText("月額費用内訳", 88, monthlyY + 37);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#7a2525";
+        ctx.fillText(`${fmt(monthly())}/月`, width - 88, monthlyY + 37);
+        monthlyY += 58;
+        monthlyLines.forEach((item) => {
+          const baseline = monthlyY + (item.detail ? 25 : 36);
+          ctx.fillStyle = "#262622";
+          ctx.textAlign = "left";
+          drawFittedText(ctx, item.name, 88, baseline, 650, 21, 16, "bold");
+          ctx.font = "bold 21px -apple-system, BlinkMacSystemFont, sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText(`${fmt(item.amount)}/月`, width - 88, baseline);
+          if (item.detail) {
+            ctx.fillStyle = "#686761";
+            ctx.font = "16px -apple-system, BlinkMacSystemFont, sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText(item.detail, 88, monthlyY + 47);
+          }
+          ctx.strokeStyle = "#d2d0ca";
+          ctx.beginPath();
+          ctx.moveTo(70, monthlyY + 58);
+          ctx.lineTo(width - 70, monthlyY + 58);
+          ctx.stroke();
+          monthlyY += 58;
+        });
+      }
+
+      let y = tableTop;
+      ctx.fillStyle = "#edeae3";
+      ctx.fillRect(70, y, width - 140, tableHeaderHeight);
+      ctx.strokeStyle = "#4b4b46";
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(70, y);
       ctx.lineTo(width - 70, y);
       ctx.moveTo(70, y + tableHeaderHeight);
       ctx.lineTo(width - 70, y + tableHeaderHeight);
       ctx.stroke();
-      ctx.fillStyle = "#1f2933";
-      ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillStyle = "#262622";
+      ctx.font = "bold 22px 'Yu Mincho', 'Hiragino Mincho ProN', serif";
       ctx.textAlign = "left";
       ctx.fillText("初期費用内訳", 88, y + 30);
       ctx.textAlign = "right";
       ctx.fillText("金額", width - 88, y + 30);
       y += tableHeaderHeight;
       rows.forEach(([name, amount]) => {
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = "#fffefa";
         ctx.fillRect(70, y, width - 140, rowHeight);
-        ctx.strokeStyle = "#d4dbe3";
+        ctx.strokeStyle = "#d2d0ca";
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(70, y + rowHeight);
         ctx.lineTo(width - 70, y + rowHeight);
         ctx.stroke();
-        ctx.fillStyle = "#1f2933";
+        ctx.fillStyle = "#262622";
         ctx.textAlign = "left";
         drawFittedText(ctx, name, 88, y + 42, 650, 25, 18);
-        ctx.fillStyle = amount < 0 ? "#b91c1c" : "#1f2933";
+        ctx.fillStyle = amount < 0 ? "#7a2525" : "#262622";
         ctx.font = "bold 27px -apple-system, BlinkMacSystemFont, sans-serif";
         ctx.textAlign = "right";
         ctx.fillText(fmt(amount), width - 88, y + 42);
@@ -1498,87 +1467,41 @@
       if (advanceLines.length) {
         y += 18;
         const blockHeight = advanceBlockHeight - 18;
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = "#fffefa";
         ctx.fillRect(70, y, width - 140, blockHeight);
-        ctx.strokeStyle = "#d4dbe3";
+        ctx.strokeStyle = "#a7a49c";
         ctx.lineWidth = 1;
         ctx.strokeRect(70, y, width - 140, blockHeight);
-        ctx.fillStyle = "#1f2933";
-        ctx.font = "bold 21px -apple-system, BlinkMacSystemFont, sans-serif";
+        ctx.fillStyle = "#262622";
+        ctx.font = "bold 21px 'Yu Mincho', 'Hiragino Mincho ProN', serif";
         ctx.textAlign = "left";
         drawFittedText(ctx, `前賃料内訳（${freeRentShareLabel()}）`, 88, y + 32, width - 176, 21, 15, "bold");
         let advanceY = y + 68;
         advanceLines.forEach((item) => {
-          ctx.fillStyle = "#1f2933";
+          ctx.fillStyle = "#262622";
           ctx.font = "bold 19px -apple-system, BlinkMacSystemFont, sans-serif";
           ctx.textAlign = "left";
           ctx.fillText(`${item.label} ${item.included ? "" : "（請求対象外）"}`, 88, advanceY);
           ctx.font = "18px -apple-system, BlinkMacSystemFont, sans-serif";
-          ctx.fillStyle = "#687381";
+          ctx.fillStyle = "#686761";
           ctx.fillText(advanceBreakdownText(item.period, item.included), 88, advanceY + 26);
           advanceY += 54;
         });
         y += blockHeight;
       }
-      if (monthlyLines.length) {
-        y += 18;
-        const blockHeight = monthlyBlockHeight - 18;
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(70, y, width - 140, blockHeight);
-        ctx.strokeStyle = "#d4dbe3";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(70, y, width - 140, blockHeight);
-        ctx.fillStyle = "#1f2933";
-        ctx.font = "bold 21px -apple-system, BlinkMacSystemFont, sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText("月額費用内訳", 88, y + 36);
-        ctx.textAlign = "right";
-        ctx.fillStyle = "#0f766e";
-        ctx.fillText(`${fmt(monthly())}/月`, width - 88, y + 36);
-        ctx.strokeStyle = "#1f2933";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(70, y + 58);
-        ctx.lineTo(width - 70, y + 58);
-        ctx.stroke();
-        let monthlyRowTop = y + 58;
-        monthlyLines.forEach((item) => {
-          const baseline = monthlyRowTop + (item.detail ? 25 : 36);
-          ctx.fillStyle = "#1f2933";
-          ctx.textAlign = "left";
-          drawFittedText(ctx, item.name, 88, baseline, 650, 21, 16, "bold");
-          ctx.font = "bold 21px -apple-system, BlinkMacSystemFont, sans-serif";
-          ctx.textAlign = "right";
-          ctx.fillText(`${fmt(item.amount)}/月`, width - 88, baseline);
-          if (item.detail) {
-            ctx.fillStyle = "#687381";
-            ctx.font = "16px -apple-system, BlinkMacSystemFont, sans-serif";
-            ctx.textAlign = "left";
-            ctx.fillText(item.detail, 88, monthlyRowTop + 47);
-          }
-          ctx.strokeStyle = "#d4dbe3";
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(70, monthlyRowTop + 58);
-          ctx.lineTo(width - 70, monthlyRowTop + 58);
-          ctx.stroke();
-          monthlyRowTop += 58;
-        });
-        y += blockHeight;
-      }
       if (memo) {
         ctx.textAlign = "left";
-        ctx.fillStyle = "#f7f9fb";
+        ctx.fillStyle = "#f4f2ec";
         ctx.fillRect(70, y + 18, width - 140, 72);
-        ctx.fillStyle = "#0f766e";
+        ctx.fillStyle = "#7a2525";
         ctx.fillRect(70, y + 18, 8, 72);
-        ctx.fillStyle = "#1f2933";
+        ctx.fillStyle = "#262622";
         ctx.font = "22px -apple-system, BlinkMacSystemFont, sans-serif";
         wrapText(ctx, memo, 94, y + 50, width - 188, 28, 2);
         y += memoHeight;
       }
       const footerY = Math.max(y + 28, height - 100);
-      ctx.fillStyle = "#687381";
+      ctx.fillStyle = "#686761";
       ctx.font = "19px -apple-system, BlinkMacSystemFont, sans-serif";
       ctx.textAlign = "left";
       ctx.fillRect(70, footerY, width - 140, 1);
@@ -1594,8 +1517,8 @@
       ctx.lineWidth = 2;
       ctx.fillRect(x, y, w, 104);
       ctx.strokeRect(x, y, w, 104);
-      ctx.fillStyle = "#687381";
-      ctx.font = "22px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillStyle = "#4b4b46";
+      ctx.font = "21px 'Yu Mincho', 'Hiragino Mincho ProN', serif";
       ctx.fillText(label, x + 24, y + 36);
       ctx.fillStyle = color;
       ctx.font = "bold 35px -apple-system, BlinkMacSystemFont, sans-serif";
@@ -1622,10 +1545,10 @@
       return `${shortened}…`;
     }
 
-    function drawFittedText(ctx, text, x, y, maxWidth, maxSize, minSize, weight = "normal") {
+    function drawFittedText(ctx, text, x, y, maxWidth, maxSize, minSize, weight = "normal", family = "-apple-system, BlinkMacSystemFont, sans-serif") {
       let size = maxSize;
       do {
-        ctx.font = `${weight} ${size}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        ctx.font = `${weight} ${size}px ${family}`;
         if (ctx.measureText(String(text)).width <= maxWidth) break;
         size -= 1;
       } while (size >= minSize);
@@ -1760,8 +1683,14 @@
 
     function printPdf() {
       if (!validateForExport()) return;
-      buildShareCard();
-      window.print();
+      const canvas = makeCanvas();
+      const dataUrl = canvas.toDataURL("image/png");
+      const shareCard = byId("shareCard");
+      shareCard.innerHTML = `<div class="print-sheet"><img id="printEstimateImage" src="${dataUrl}" alt="賃貸初期費用概算書"></div>`;
+      const printImage = byId("printEstimateImage");
+      const openPrintDialog = () => requestAnimationFrame(() => window.print());
+      if (printImage.complete) openPrintDialog();
+      else printImage.addEventListener("load", openPrintDialog, { once: true });
     }
 
     function showToast(message) {
