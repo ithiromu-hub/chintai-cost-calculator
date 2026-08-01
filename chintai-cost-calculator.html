@@ -518,6 +518,12 @@
       box-shadow: none;
     }
 
+    .ghost-button.danger {
+      border: 1px solid #d7c7c7;
+      color: #8a3030;
+      background: #fff;
+    }
+
     #shareCard {
       position: fixed;
       left: -9999px;
@@ -804,6 +810,41 @@
           </label>
         </div>
       </section>
+
+      <section>
+        <div class="section-head">
+          <h2>発行元情報</h2>
+          <strong class="section-total" id="issuerStorageStatus">この端末内に保存</strong>
+        </div>
+        <div class="fields" id="issuerFields">
+          <div class="grid-2">
+            <label>会社名
+              <input id="issuerCompany" autocomplete="organization" placeholder="例: 株式会社〇〇不動産">
+            </label>
+            <label>担当者名
+              <input id="issuerStaff" autocomplete="name" placeholder="例: 山田 太郎">
+            </label>
+          </div>
+          <label>住所
+            <input id="issuerAddress" autocomplete="street-address" placeholder="例: 東京都〇〇区〇〇1-2-3">
+          </label>
+          <div class="grid-2">
+            <label>電話番号
+              <input id="issuerTel" type="tel" autocomplete="tel" placeholder="例: 03-1234-5678">
+            </label>
+            <label>FAX
+              <input id="issuerFax" type="tel" placeholder="例: 03-1234-5679">
+            </label>
+          </div>
+          <label class="toggle">
+            <input id="issuerVisible" type="checkbox" checked>
+            概算書に発行元情報を表示
+          </label>
+        </div>
+        <div class="small-action">
+          <button class="ghost-button danger" id="clearIssuer" type="button">端末内の発行元情報を削除</button>
+        </div>
+      </section>
     </main>
 
     <div class="actions">
@@ -867,7 +908,10 @@
       { label: "火災保険料", value: "", mode: "amount", includeInAdvance: true, includeInGuarantee: true },
       { label: "24時間サポート", value: "", mode: "amount", includeInAdvance: true, includeInGuarantee: true }
     ];
+    const issuerStorageKey = "chintai-cost-calculator:issuer:v1";
+    const issuerFieldIds = ["issuerCompany", "issuerStaff", "issuerAddress", "issuerTel", "issuerFax"];
     let extraItemSequence = 0;
+    let persistentStorageRequested = false;
     let previewReturnFocus = null;
 
     function makeLineItem(def) {
@@ -1399,6 +1443,74 @@
       input.value = formatMoneyInputValue(amount);
     }
 
+    function issuerInfo() {
+      return {
+        company: byId("issuerCompany").value.trim(),
+        staff: byId("issuerStaff").value.trim(),
+        address: byId("issuerAddress").value.trim(),
+        tel: byId("issuerTel").value.trim(),
+        fax: byId("issuerFax").value.trim(),
+        visible: byId("issuerVisible").checked
+      };
+    }
+
+    function hasIssuerInfo(info = issuerInfo()) {
+      return [info.company, info.staff, info.address, info.tel, info.fax].some(Boolean);
+    }
+
+    async function requestPersistentStorage() {
+      if (persistentStorageRequested || !navigator.storage?.persist) return;
+      persistentStorageRequested = true;
+      try {
+        const isPersistent = navigator.storage.persisted ? await navigator.storage.persisted() : false;
+        if (!isPersistent) await navigator.storage.persist();
+      } catch (error) {
+        // localStorage remains usable even when persistent mode is unavailable.
+      }
+    }
+
+    function saveIssuerInfo() {
+      clearTimeout(saveIssuerInfo.timer);
+      saveIssuerInfo.timer = setTimeout(() => {
+        try {
+          localStorage.setItem(issuerStorageKey, JSON.stringify(issuerInfo()));
+          byId("issuerStorageStatus").textContent = "この端末内に保存済み";
+          requestPersistentStorage();
+        } catch (error) {
+          byId("issuerStorageStatus").textContent = "端末内に保存できません";
+        }
+      }, 150);
+    }
+
+    function loadIssuerInfo() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(issuerStorageKey) || "null");
+        if (!saved || typeof saved !== "object") return;
+        issuerFieldIds.forEach((id) => {
+          const key = id.replace("issuer", "").toLowerCase();
+          byId(id).value = typeof saved[key] === "string" ? saved[key] : "";
+        });
+        byId("issuerVisible").checked = saved.visible !== false;
+        byId("issuerStorageStatus").textContent = "この端末内に保存済み";
+      } catch (error) {
+        byId("issuerStorageStatus").textContent = "保存情報を読み込めません";
+      }
+    }
+
+    function clearIssuerInfo() {
+      if (!window.confirm("この端末に保存した発行元情報を削除しますか？")) return;
+      try {
+        localStorage.removeItem(issuerStorageKey);
+      } catch (error) {
+        // Clear the visible fields even if browser storage is unavailable.
+      }
+      issuerFieldIds.forEach((id) => { byId(id).value = ""; });
+      byId("issuerVisible").checked = true;
+      byId("issuerStorageStatus").textContent = "この端末内に保存";
+      calculate();
+      showToast("端末内の発行元情報を削除しました。");
+    }
+
     function classicContractBasis(def) {
       if (["deposit", "keyMoney", "brokerage"].includes(def.id) && byId(`${def.id}Mode`)?.value === "month") {
         return `（${byId(`${def.id}Value`).value || 0}ヶ月分）`;
@@ -1485,6 +1597,8 @@
       const customer = displayCustomerName();
       const start = displayContractStart();
       const memo = byId("memo").value.trim();
+      const issuer = issuerInfo();
+      const showIssuer = issuer.visible && hasIssuerInfo(issuer);
       const monthlyLines = monthlyCostLines();
       const monthlyBreakdown = monthlyLines.map((item) => `${item.name} ${fmt(item.amount)}`).join("　");
       const canvas = document.createElement("canvas");
@@ -1612,7 +1726,7 @@
         wrapText(ctx, `備考：${memo}`, tableX, footerY + 18, tableWidth, 22, 2);
         footerY += 58;
       }
-      footerY = Math.max(footerY, height - 85);
+      footerY = Math.max(footerY, height - (showIssuer ? 145 : 85));
       ctx.fillStyle = "#050505";
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
@@ -1620,6 +1734,17 @@
       wrapText(ctx, "この概算書は正式な請求書ではありません。審査内容・契約開始日・管理会社指定条件により金額が変更となる場合があります。", tableX, footerY + 18, tableWidth - 120, 21, 2);
       ctx.textAlign = "right";
       ctx.fillText("単位：円", tableX + tableWidth, footerY + 18);
+      if (showIssuer) {
+        ctx.fillStyle = "#050505";
+        ctx.textAlign = "left";
+        drawFittedText(ctx, issuer.company, tableX, height - 78, tableWidth, 17, 12, "bold");
+        drawFittedText(ctx, issuer.address, tableX, height - 55, tableWidth, 14, 10);
+        const contact = [issuer.tel ? `TEL ${issuer.tel}` : "", issuer.fax ? `FAX ${issuer.fax}` : ""].filter(Boolean).join("　");
+        drawFittedText(ctx, contact, tableX, height - 31, 610, 14, 10);
+        ctx.textAlign = "right";
+        drawFittedText(ctx, issuer.staff ? `担当　${issuer.staff}` : "", tableX + tableWidth, height - 31, 350, 14, 10);
+        ctx.fillRect(tableX, height - 20, tableWidth, 1);
+      }
       return canvas;
     }
 
@@ -1834,6 +1959,9 @@
       removeButton.closest("[data-extra]").remove();
       calculate();
     });
+    byId("issuerFields").addEventListener("input", saveIssuerInfo);
+    byId("issuerFields").addEventListener("change", saveIssuerInfo);
+    byId("clearIssuer").addEventListener("click", clearIssuerInfo);
     byId("shareImage").addEventListener("click", shareImage);
     byId("saveImage").addEventListener("click", saveImage);
     byId("printPdf").addEventListener("click", printPdf);
@@ -1867,6 +1995,7 @@
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
       navigator.serviceWorker.register("./service-worker.js").catch(() => {});
     }
+    loadIssuerInfo();
     calculate();
   </script>
 </body>
