@@ -201,6 +201,52 @@
       background: #f7f9fb;
     }
 
+    .optional-cost-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 2px 12px 0;
+      padding: 14px 2px 8px;
+      border-top: 1px solid var(--line);
+    }
+
+    .optional-cost-head h3 {
+      margin: 0;
+      font-size: 13px;
+      letter-spacing: 0;
+    }
+
+    .extra-title {
+      gap: 10px;
+    }
+
+    .extra-title > span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .extra-title-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 0 0 auto;
+    }
+
+    .remove-row {
+      min-width: 44px;
+      min-height: 36px;
+      border: 1px solid #d7c7c7;
+      border-radius: 8px;
+      padding: 6px 9px;
+      color: #8a3030;
+      background: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
     .monthly-item {
       padding: 0;
     }
@@ -669,6 +715,14 @@
           <strong class="section-total" id="contractTotal">0円</strong>
         </div>
         <div class="fields" id="contractItems"></div>
+        <div class="optional-cost-head">
+          <h3>任意の初期費用</h3>
+          <strong class="section-total" id="extraTotal">0円</strong>
+        </div>
+        <div class="fields" id="extraItems"></div>
+        <div class="small-action">
+          <button class="ghost-button" id="addExtra" type="button">＋ 項目を追加</button>
+        </div>
       </section>
 
       <section>
@@ -742,14 +796,9 @@
 
       <section>
         <div class="section-head">
-          <h2>追加費用・メモ</h2>
-          <strong class="section-total" id="extraTotal">0円</strong>
+          <h2>備考</h2>
         </div>
-        <div class="fields" id="extraItems"></div>
-        <div class="small-action">
-          <button class="ghost-button" id="addExtra" type="button">追加行</button>
-        </div>
-        <div class="fields" style="padding-top:0">
+        <div class="fields">
           <label>お客様向けメモ
             <textarea id="memo" placeholder="例: 火災保険・保証会社は審査内容により変動する場合があります。"></textarea>
           </label>
@@ -818,7 +867,7 @@
       { label: "火災保険料", value: "", mode: "amount", includeInAdvance: true, includeInGuarantee: true },
       { label: "24時間サポート", value: "", mode: "amount", includeInAdvance: true, includeInGuarantee: true }
     ];
-    const extraDefaults = [];
+    let extraItemSequence = 0;
     let previewReturnFocus = null;
 
     function makeLineItem(def) {
@@ -899,7 +948,13 @@
       wrap.className = "line-item";
       wrap.dataset.extra = id;
       wrap.innerHTML = `
-        <div class="line-title">追加費用 <output id="${id}Output">0円</output></div>
+        <div class="line-title extra-title">
+          <span id="${id}Title">${label || "任意項目"}</span>
+          <span class="extra-title-actions">
+            <output id="${id}Output">0円</output>
+            <button class="remove-row" type="button" data-remove-extra aria-label="この項目を削除">削除</button>
+          </span>
+        </div>
         <div class="grid-2">
           <label>項目名
             <input id="${id}Name" value="${label}" placeholder="例: 室内清掃費">
@@ -909,6 +964,14 @@
           </label>
         </div>`;
       return wrap;
+    }
+
+    function addExtraItem(label = "", value = "", focus = false) {
+      const item = makeExtraItem(extraItemSequence++, label, value);
+      byId("extraItems").appendChild(item);
+      calculate();
+      if (focus) item.querySelector("input").focus();
+      return item;
     }
 
     function makeMonthlyItem(index, label = "", value = "", includeInAdvance = true, includeInGuarantee = true, mode = "amount") {
@@ -1221,10 +1284,10 @@
         byId(`${id}Title`).textContent = byId(`${id}Name`).value.trim() || "月次費用";
         byId(`${id}Output`).textContent = amount > 0 ? `${fmt(amount)}/月` : "未設定";
       });
-      let contractTotal = 0;
+      let baseContractTotal = 0;
       contractDefs.forEach((def) => {
         const amount = lineAmount(def.id);
-        contractTotal += amount;
+        baseContractTotal += amount;
         byId(`${def.id}Output`).textContent = fmt(amount);
       });
       if (byId("guaranteeNote")) {
@@ -1256,10 +1319,12 @@
         const id = row.dataset.extra;
         const amount = money(parseMoneyInput(byId(`${id}Value`).value, true));
         extraTotal += amount;
+        byId(`${id}Title`).textContent = byId(`${id}Name`).value.trim() || "任意項目";
         byId(`${id}Output`).textContent = fmt(amount);
       });
 
-      const grand = contractTotal + advanceTotal + extraTotal;
+      const contractTotal = baseContractTotal + extraTotal;
+      const grand = contractTotal + advanceTotal;
       byId("contractTotal").textContent = fmt(contractTotal);
       byId("advanceTotal").textContent = fmt(advanceTotal);
       byId("extraTotal").textContent = fmt(extraTotal);
@@ -1705,7 +1770,7 @@
       byId("monthlyItems").appendChild(makeMonthlyItem(index, item.label, item.value, item.includeInAdvance, item.includeInGuarantee, item.mode));
     });
     contractDefs.forEach((def) => byId("contractItems").appendChild(makeLineItem(def)));
-    extraDefaults.forEach(([label, value], index) => byId("extraItems").appendChild(makeExtraItem(index, label, value)));
+    addExtraItem();
     byId("addMonthly").addEventListener("click", () => {
       const item = makeMonthlyItem(monthlyRows().length, "", "", true);
       item.open = true;
@@ -1714,7 +1779,12 @@
       item.querySelector("input").focus();
     });
     byId("addExtra").addEventListener("click", () => {
-      byId("extraItems").appendChild(makeExtraItem(extraRows().length, "", ""));
+      addExtraItem("", "", true);
+    });
+    byId("extraItems").addEventListener("click", (event) => {
+      const removeButton = event.target.closest("[data-remove-extra]");
+      if (!removeButton) return;
+      removeButton.closest("[data-extra]").remove();
       calculate();
     });
     byId("shareImage").addEventListener("click", shareImage);
