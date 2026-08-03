@@ -1554,9 +1554,6 @@
         const amount = money(parseMoneyInput(byId(`${id}Value`).value, true));
         if (amount !== 0) rows.push({ label: byId(`${id}Name`).value.trim() || "追加費用", basis: "", amount });
       });
-      monthlyFeeLines().forEach((item) => {
-        rows.push({ label: `月額：${item.name}`, basis: "", amount: item.amount, monthly: true });
-      });
       return rows;
     }
 
