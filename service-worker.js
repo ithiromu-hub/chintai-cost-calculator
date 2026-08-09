@@ -1,4 +1,4 @@
-const CACHE_NAME = "chintai-cost-calculator-v13";
+const CACHE_NAME = "chintai-cost-calculator-v14";
 const APP_FILES = [
   "./",
   "./index.html",

@@ -349,6 +349,18 @@
       line-height: 1.45;
     }
 
+    .deposit-surcharge {
+      display: grid;
+      gap: 8px;
+      margin-top: 2px;
+      padding-top: 10px;
+      border-top: 1px dashed #ccd3dc;
+    }
+
+    .deposit-surcharge .line-title {
+      font-size: 12px;
+    }
+
     .advance-breakdown {
       display: grid;
       gap: 4px;
@@ -920,6 +932,21 @@
       wrap.className = "line-item";
       wrap.dataset.id = id;
       if (type === "rentMonthOrAmount") {
+        const depositSurcharge = id === "deposit" ? `
+          <div class="deposit-surcharge">
+            <div class="line-title">ペット飼育時の敷金積み増し<output id="petDepositOutput">0円</output></div>
+            <div class="mode-row compact">
+              <label>数値
+                <input id="petDepositValue" type="text" inputmode="decimal" value="0" data-money data-money-mode="petDepositMode" data-assume-man="true">
+              </label>
+              <label>指定方法
+                <select id="petDepositMode">
+                  <option value="month">ヶ月</option>
+                  <option value="amount">金額指定</option>
+                </select>
+              </label>
+            </div>
+          </div>` : "";
         wrap.innerHTML = `
           <div class="line-title">${label}<output id="${id}Output">0円</output></div>
           <div class="mode-row compact">
@@ -932,7 +959,8 @@
                 <option value="amount">金額指定</option>
               </select>
             </label>
-          </div>`;
+          </div>
+          ${depositSurcharge}`;
         wrap.querySelector(`#${id}Mode`).value = mode;
         wrap.querySelector(`#${id}Value`).value = value;
       } else if (type === "brokerage") {
@@ -1086,6 +1114,21 @@
         return mode === "percent" ? money(guaranteeBaseMonthly() * value / 100) : money(parseMoneyInput(byId(`${id}Value`).value, true));
       }
       return money(parseMoneyInput(byId(`${id}AmountValue`).value, true));
+    }
+
+    function petDepositAmount() {
+      const mode = byId("petDepositMode")?.value || "month";
+      const value = byId("petDepositValue")?.value || "0";
+      return mode === "month"
+        ? money(rent() * (Number(value) || 0))
+        : money(parseMoneyInput(value, true));
+    }
+
+    function petDepositBasis() {
+      if (byId("petDepositMode")?.value === "month") {
+        return `（ペット飼育のため・${byId("petDepositValue").value || 0}ヶ月分）`;
+      }
+      return "（ペット飼育のため）";
     }
 
     function parseLocalDate(value) {
@@ -1334,6 +1377,9 @@
         baseContractTotal += amount;
         byId(`${def.id}Output`).textContent = fmt(amount);
       });
+      const petDeposit = petDepositAmount();
+      baseContractTotal += petDeposit;
+      byId("petDepositOutput").textContent = fmt(petDeposit);
       if (byId("guaranteeNote")) {
         const excluded = monthlyFeeLines().filter((item) => !item.includeInGuarantee).map((item) => item.name);
         byId("guaranteeNote").textContent = byId("guaranteeMode").value === "percent"
@@ -1388,7 +1434,13 @@
 
     function rowsForShare() {
       const totals = calculate();
-      const rows = contractDefs.map((def) => [displayContractLabel(def), lineAmount(def.id)]);
+      const rows = [];
+      contractDefs.forEach((def) => {
+        rows.push([displayContractLabel(def), lineAmount(def.id)]);
+        if (def.id === "deposit" && petDepositAmount() > 0) {
+          rows.push(["敷金積み増し分（ペット飼育のため）", petDepositAmount()]);
+        }
+      });
       rows.push(
         ["当月日割前賃料", totals.proratedAmount],
         ["翌月分前賃料", totals.next],
@@ -1522,11 +1574,19 @@
     }
 
     function classicDocumentRows(totals) {
-      const rows = contractDefs.map((def) => ({
-        label: displayContractLabel(def),
-        basis: classicContractBasis(def),
-        amount: lineAmount(def.id)
-      })).filter((item) => item.amount !== 0);
+      const rows = [];
+      contractDefs.forEach((def) => {
+        const amount = lineAmount(def.id);
+        if (amount !== 0) {
+          rows.push({ label: displayContractLabel(def), basis: classicContractBasis(def), amount });
+        }
+        if (def.id === "deposit") {
+          const surcharge = petDepositAmount();
+          if (surcharge > 0) {
+            rows.push({ label: "敷金積み増し分", basis: petDepositBasis(), amount: surcharge });
+          }
+        }
+      });
       const start = parseLocalDate(byId("contractStartDate").value);
       if (start) {
         const currentEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0);
