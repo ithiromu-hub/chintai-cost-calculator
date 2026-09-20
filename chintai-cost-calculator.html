@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icon-180.png">
-  <title>賃貸初期費用計算</title>
+  <title>賃貸初期費用計算 v1.0.0</title>
   <style>
     :root {
       color-scheme: light;
@@ -674,7 +674,7 @@
   <div class="app">
     <header>
       <div>
-        <h1>賃貸初期費用計算</h1>
+        <h1>賃貸初期費用計算 <small style="font-size:12px;color:var(--muted)">v1.0.0</small></h1>
       </div>
       <div class="total-chip">
         <span>概算合計</span>
@@ -879,6 +879,7 @@
     </div>
   </div>
 
+  <script src="./jds-device-auth.js"></script>
   <script>
     const byId = (id) => document.getElementById(id);
     const money = (value) => Math.max(0, Math.round(Number(value) || 0));
