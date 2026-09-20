@@ -3,7 +3,7 @@
   const API_URL = "https://jds-tool.aincehome.com/api/business-tools/device-auth";
   const STORAGE_KEY = "jdsBusinessToolDeviceAuthV2";
   const TOOL_ID = "chintai-cost-calculator";
-  const VERSION = "1.0.1";
+  const VERSION = "1.0.2";
   let expiryTimer = 0;
   let heartbeatTimer = 0;
 
@@ -42,7 +42,7 @@
       host.id = "jds-device-auth";
       host.style.cssText = "position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;padding:20px;background:rgba(15,23,42,.82)";
       const shadow = host.attachShadow({ mode: "open" });
-      shadow.innerHTML = `<style>*{box-sizing:border-box}.box{width:min(460px,100%);padding:24px;border-radius:14px;background:#fff;color:#172033;font:14px/1.6 system-ui;box-shadow:0 20px 50px #0007}h2{margin:0 0 8px;font-size:20px}.note{padding:9px 11px;border-left:4px solid #0f766e;background:#ecfdf5}label{display:grid;gap:5px;margin:14px 0;font-weight:700}input{padding:10px;border:1px solid #94a3b8;border-radius:7px;font:inherit}button{width:100%;padding:11px;border:0;border-radius:7px;background:#0f766e;color:#fff;font:inherit;font-weight:800}.status{min-height:22px;color:#b91c1c;font-weight:700}</style><form class="box"><h2>端末認証</h2><p class="note">初回起動時にPCユーザー名と接続元IPをJDSへ記録します。</p><label>PCのユーザー名<input name="username" maxlength="80" autocomplete="username" required></label><label>起動パスワード<input name="password" type="password" autocomplete="current-password" required></label><button type="submit">認証して起動</button><p class="status"></p></form>`;
+      shadow.innerHTML = `<style>*{box-sizing:border-box}.box{width:min(460px,100%);padding:24px;border-radius:14px;background:#fff;color:#172033;font:14px/1.6 system-ui;box-shadow:0 20px 50px #0007}h2{margin:0 0 8px;font-size:20px}.note{padding:9px 11px;border-left:4px solid #0f766e;background:#ecfdf5}label{display:grid;gap:5px;margin:14px 0;font-weight:700}input{padding:10px;border:1px solid #94a3b8;border-radius:7px;font:inherit}button{width:100%;padding:11px;border:0;border-radius:7px;background:#0f766e;color:#fff;font:inherit;font-weight:800}.status{min-height:22px;color:#b91c1c;font-weight:700}</style><form class="box"><h2>ログイン</h2><p class="note">ツールを利用するにはログインしてください。</p><label>ユーザー名<input name="username" maxlength="80" autocomplete="username" required></label><label>パスワード<input name="password" type="password" autocomplete="current-password" required></label><button type="submit">ログイン</button><p class="status"></p></form>`;
       const form = shadow.querySelector("form");
       const username = form.elements.username;
       const password = form.elements.password;
@@ -52,7 +52,7 @@
       form.onsubmit = async (event) => {
         event.preventDefault();
         button.disabled = true;
-        status.textContent = "JDSで確認中です…";
+        status.textContent = "確認中です…";
         const deviceId = String(saved.deviceId || (crypto.randomUUID?.() || `${Date.now()}${Math.random()}`).replace(/[^a-z0-9_-]/gi, ""));
         try {
           const result = await post({ action: "activate", deviceId, pcUsername: username.value.trim(), password: password.value });
