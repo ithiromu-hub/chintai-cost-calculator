@@ -1,9 +1,11 @@
 (() => {
   "use strict";
   const API_URL = "https://jds-tool.aincehome.com/api/business-tools/device-auth";
-  const STORAGE_KEY = "jdsBusinessToolDeviceAuthV1";
+  const STORAGE_KEY = "jdsBusinessToolDeviceAuthV2";
   const TOOL_ID = "chintai-cost-calculator";
-  const VERSION = "1.0.0";
+  const VERSION = "1.0.1";
+  let expiryTimer = 0;
+  let heartbeatTimer = 0;
 
   async function post(payload) {
     const response = await fetch(API_URL, {
@@ -27,6 +29,13 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
   }
 
+  function scheduleChecks(expiresAt) {
+    clearTimeout(expiryTimer);
+    const delay = Math.max(1000, Math.min(0x7fffffff, Number(expiresAt || 0) - Date.now()));
+    expiryTimer = setTimeout(() => { void enforceAuthorization(); }, delay);
+    if (!heartbeatTimer) heartbeatTimer = setInterval(() => { void enforceAuthorization(); }, 15 * 60 * 1000);
+  }
+
   function showForm(saved) {
     return new Promise((resolve) => {
       const host = document.createElement("div");
@@ -48,14 +57,15 @@
         try {
           const result = await post({ action: "activate", deviceId, pcUsername: username.value.trim(), password: password.value });
           const next = { ...saved, deviceId, pcUsername: username.value.trim(), tools: { ...(saved.tools || {}) } };
-          if (result.mode === "trusted") next.tools[TOOL_ID] = { mode: result.mode, accessToken: result.accessToken };
-          else delete next.tools[TOOL_ID];
+          const expiresAt = Date.parse(result.expiresAt) || Date.now() + 60 * 60 * 1000;
+          next.tools[TOOL_ID] = { accessToken: result.accessToken, expiresAt };
           save(next);
+          scheduleChecks(expiresAt);
           host.remove();
-          resolve({ mode: result.mode });
+          resolve({ ok: true });
         } catch (error) {
           password.value = "";
-          status.textContent = error?.message === "invalid_password" ? "パスワードが違います。" : `認証できませんでした（${error?.message || "通信エラー"}）`;
+          status.textContent = error?.message === "invalid_password" ? "パスワードが違います。" : "認証できません。管理者へ連絡してください。";
           button.disabled = false;
         }
       };
@@ -66,17 +76,38 @@
 
   async function authorize() {
     const saved = readSaved();
-    const trusted = saved.tools?.[TOOL_ID];
-    if (trusted?.mode === "trusted" && trusted?.accessToken) {
+    const credential = saved.tools?.[TOOL_ID];
+    if (credential?.accessToken) {
       try {
-        const result = await post({ action: "resume", accessToken: trusted.accessToken });
-        return { mode: result.mode };
+        const result = await post({ action: "resume", accessToken: credential.accessToken });
+        const expiresAt = Date.parse(result.expiresAt) || Date.now() + 60 * 60 * 1000;
+        saved.tools[TOOL_ID] = { accessToken: result.accessToken || credential.accessToken, expiresAt };
+        save(saved);
+        scheduleChecks(expiresAt);
+        return { ok: true };
       } catch {
         delete saved.tools[TOOL_ID];
         save(saved);
       }
     }
     return showForm(saved);
+  }
+
+  async function enforceAuthorization() {
+    const saved = readSaved();
+    const credential = saved.tools?.[TOOL_ID];
+    if (!credential?.accessToken) return;
+    try {
+      const result = await post({ action: "resume", accessToken: credential.accessToken });
+      const expiresAt = Date.parse(result.expiresAt) || Date.now() + 60 * 60 * 1000;
+      saved.tools[TOOL_ID] = { accessToken: result.accessToken || credential.accessToken, expiresAt };
+      save(saved);
+      scheduleChecks(expiresAt);
+    } catch {
+      delete saved.tools[TOOL_ID];
+      save(saved);
+      if (!document.getElementById("jds-device-auth")) void showForm(saved);
+    }
   }
 
   window.JdsDeviceAuthReady = authorize();
