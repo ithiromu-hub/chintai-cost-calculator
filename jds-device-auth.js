@@ -1,114 +1,57 @@
 (() => {
   "use strict";
-  const API_URL = "https://jds-tool.aincehome.com/api/business-tools/device-auth";
-  const STORAGE_KEY = "jdsBusinessToolDeviceAuthV2";
+  const BROKER_ID = "knholmgicchgkipplfmgpgdikmfibbmp";
   const TOOL_ID = "chintai-cost-calculator";
-  const VERSION = "1.0.2";
-  let expiryTimer = 0;
-  let heartbeatTimer = 0;
+  const VERSION = "1.1.0";
+  const ENFORCEMENT_AT = Date.parse("2026-09-30T15:00:00.000Z");
+  let blocker = null;
 
-  async function post(payload) {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "omit",
-      cache: "no-store",
-      body: JSON.stringify({ ...payload, toolId: TOOL_ID, version: VERSION })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.ok) throw new Error(String(data.error || `HTTP_${response.status}`));
-    return data;
-  }
-
-  function readSaved() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
-    catch { return {}; }
-  }
-
-  function save(value) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
-  }
-
-  function scheduleChecks(expiresAt) {
-    clearTimeout(expiryTimer);
-    const delay = Math.max(1000, Math.min(0x7fffffff, Number(expiresAt || 0) - Date.now()));
-    expiryTimer = setTimeout(() => { void enforceAuthorization(); }, delay);
-    if (!heartbeatTimer) heartbeatTimer = setInterval(() => { void enforceAuthorization(); }, 15 * 60 * 1000);
-  }
-
-  function showForm(saved) {
+  function request() {
     return new Promise((resolve) => {
-      const host = document.createElement("div");
-      host.id = "jds-device-auth";
-      host.style.cssText = "position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;padding:20px;background:rgba(15,23,42,.82)";
-      const shadow = host.attachShadow({ mode: "open" });
-      shadow.innerHTML = `<style>*{box-sizing:border-box}.box{width:min(460px,100%);padding:24px;border-radius:14px;background:#fff;color:#172033;font:14px/1.6 system-ui;box-shadow:0 20px 50px #0007}h2{margin:0 0 8px;font-size:20px}.note{padding:9px 11px;border-left:4px solid #0f766e;background:#ecfdf5}label{display:grid;gap:5px;margin:14px 0;font-weight:700}input{padding:10px;border:1px solid #94a3b8;border-radius:7px;font:inherit}button{width:100%;padding:11px;border:0;border-radius:7px;background:#0f766e;color:#fff;font:inherit;font-weight:800}.status{min-height:22px;color:#b91c1c;font-weight:700}</style><form class="box"><h2>ログイン</h2><p class="note">ツールを利用するにはログインしてください。</p><label>ユーザー名<input name="username" maxlength="80" autocomplete="username" required></label><label>パスワード<input name="password" type="password" autocomplete="current-password" required></label><button type="submit">ログイン</button><p class="status"></p></form>`;
-      const form = shadow.querySelector("form");
-      const username = form.elements.username;
-      const password = form.elements.password;
-      const button = form.querySelector("button");
-      const status = form.querySelector(".status");
-      username.value = String(saved.pcUsername || "");
-      form.onsubmit = async (event) => {
-        event.preventDefault();
-        button.disabled = true;
-        status.textContent = "確認中です…";
-        const deviceId = String(saved.deviceId || (crypto.randomUUID?.() || `${Date.now()}${Math.random()}`).replace(/[^a-z0-9_-]/gi, ""));
-        try {
-          const result = await post({ action: "activate", deviceId, pcUsername: username.value.trim(), password: password.value });
-          const next = { ...saved, deviceId, pcUsername: username.value.trim(), tools: { ...(saved.tools || {}) } };
-          const expiresAt = Date.parse(result.expiresAt) || Date.now() + 60 * 60 * 1000;
-          next.tools[TOOL_ID] = { accessToken: result.accessToken, expiresAt };
-          save(next);
-          scheduleChecks(expiresAt);
-          host.remove();
-          resolve({ ok: true });
-        } catch (error) {
-          password.value = "";
-          status.textContent = error?.message === "invalid_password" ? "パスワードが違います。" : "認証できません。管理者へ連絡してください。";
-          button.disabled = false;
-        }
-      };
-      document.documentElement.appendChild(host);
-      (username.value ? password : username).focus();
+      if (!globalThis.chrome?.runtime?.sendMessage) {
+        resolve({ ok: false, allowed: Date.now() < ENFORCEMENT_AT, reason: "broker_unavailable" });
+        return;
+      }
+      const timeout = setTimeout(() => resolve({ ok: false, allowed: Date.now() < ENFORCEMENT_AT, reason: "broker_timeout" }), 6000);
+      chrome.runtime.sendMessage(BROKER_ID, { type: "JDS_DEVICE_ACCESS", toolId: TOOL_ID, version: VERSION }, (response) => {
+        clearTimeout(timeout);
+        if (chrome.runtime.lastError) resolve({ ok: false, allowed: Date.now() < ENFORCEMENT_AT, reason: "broker_unavailable" });
+        else resolve(response || { ok: false, allowed: false, reason: "broker_unavailable" });
+      });
     });
+  }
+
+  function showBlocked(status) {
+    if (blocker) return;
+    blocker = document.createElement("div");
+    blocker.id = "jds-device-access-blocker";
+    blocker.style.cssText = "position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;padding:20px;background:rgba(15,23,42,.82)";
+    const shadow = blocker.attachShadow({ mode: "closed" });
+    const update = status?.reason === "outdated_blocked";
+    shadow.innerHTML = `<style>*{box-sizing:border-box}.box{width:min(420px,100%);padding:24px;border-radius:14px;background:#fff;color:#172033;font:14px/1.6 system-ui;box-shadow:0 20px 50px #0007}h2{margin:0 0 8px;font-size:20px}button{width:100%;padding:11px;border:0;border-radius:7px;background:#0f766e;color:#fff;font:inherit;font-weight:800}</style><section class="box"><h2>${update ? "最新版への更新が必要です" : "このツールは現在利用できません"}</h2><p>${update ? "JDSの業務改善ファイルから更新してください。" : "しばらくしてから再確認してください。"}</p><button type="button">再確認</button></section>`;
+    shadow.querySelector("button").addEventListener("click", () => void authorize());
+    document.documentElement.appendChild(blocker);
   }
 
   async function authorize() {
-    const saved = readSaved();
-    const credential = saved.tools?.[TOOL_ID];
-    if (credential?.accessToken) {
-      try {
-        const result = await post({ action: "resume", accessToken: credential.accessToken });
-        const expiresAt = Date.parse(result.expiresAt) || Date.now() + 60 * 60 * 1000;
-        saved.tools[TOOL_ID] = { accessToken: result.accessToken || credential.accessToken, expiresAt };
-        save(saved);
-        scheduleChecks(expiresAt);
-        return { ok: true };
-      } catch {
-        delete saved.tools[TOOL_ID];
-        save(saved);
+    const status = await request();
+    if (status.allowed) {
+      blocker?.remove();
+      blocker = null;
+      return true;
+    }
+    if (status.passwordRequired) {
+      for (let attempt = 0; attempt < 150; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const retry = await request();
+        if (retry.allowed) return authorize();
+        if (!retry.passwordRequired) { showBlocked(retry); return false; }
       }
     }
-    return showForm(saved);
-  }
-
-  async function enforceAuthorization() {
-    const saved = readSaved();
-    const credential = saved.tools?.[TOOL_ID];
-    if (!credential?.accessToken) return;
-    try {
-      const result = await post({ action: "resume", accessToken: credential.accessToken });
-      const expiresAt = Date.parse(result.expiresAt) || Date.now() + 60 * 60 * 1000;
-      saved.tools[TOOL_ID] = { accessToken: result.accessToken || credential.accessToken, expiresAt };
-      save(saved);
-      scheduleChecks(expiresAt);
-    } catch {
-      delete saved.tools[TOOL_ID];
-      save(saved);
-      if (!document.getElementById("jds-device-auth")) void showForm(saved);
-    }
+    showBlocked(status);
+    return false;
   }
 
   window.JdsDeviceAuthReady = authorize();
+  setInterval(() => { void authorize(); }, 5 * 60 * 1000);
 })();
