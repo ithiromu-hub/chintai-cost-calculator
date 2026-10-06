@@ -6,7 +6,8 @@
 - PWA cache v19へ更新。オンラインのページ/旧認証スクリプトをnetwork-first、通信失敗時は同じアプリの保存済み画面へfallback。他のGitHub Pagesアプリのcacheは削除しない。入力中画面の強制再読込なし。
 - 開始時main eaddba9/origin一致・dirtyなし。計算/画像/PDFの処理を変更しない。Discord通知はしない。
 - 検証済み: 回帰5テスト・全スクリプト構文・diff check。390pxの確認用Chromeでアドオン照会なし/ブロックなし、検証用入力の合計422,113円、画像PNG生成/プレビューと画像保存を確認。PDF生成処理は既存のまま（実印刷・iPhone実機の保存/共有は未検証）。入力中の利用者タブは触らず専用タブで確認。
-- 公開反映は作業中。次: Commit/Push、GitHub Pagesの公開HTTP/ファイル一致とアドオンなしの画面確認。JDS本体や他ツールの端末承認・認証判定を変更しない。
+- 公開反映済み: code 78a2254をorigin/mainへpush、GitHub Pagesのbuild built/commit一致。HTML/旧認証互換JS/SWの公開HTTP200と内容・改行正規化SHA256一致（8faf7e3ea407d820733679540e2769fe0847641b2d48403f0e0465c0daad878f / 8c3de367ce35cba19b93d1591f28d36e1f6e3a8a4d8463286332b3537c0022ce / 01d465156569b4ffc47cdb099f65fa7c72d7e0fca82644a6a6b9523a30cd3942）。公開390px画面でv1.2.0/ブロックなし/認証スクリプトなし/入力可能をDOM確認。
+- 更新用リンク: https://ithiromu-hub.github.io/chintai-cost-calculator/chintai-cost-calculator.html?v=1.2.0 。既存ホーム画面版が旧cacheの場合はこの直接リンクを先に開く。今回の実装/公開残なし。JDS本体や他ツールの端末承認・認証判定を変更していない。JDSメニューの既存版数表示は1.1.1のまま、計算ページ本体は1.2.0。iPhone実機操作は未検証。
 
 ## 1.1.1 - 2026-09-22
 
