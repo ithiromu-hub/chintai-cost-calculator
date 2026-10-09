@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icon-180.png">
-  <title>賃貸初期費用計算 v1.3.0</title>
+  <title>賃貸初期費用計算 v1.3.1</title>
   <style>
     :root {
       color-scheme: light;
@@ -678,7 +678,7 @@
   <div class="app">
     <header>
       <div>
-        <h1>賃貸初期費用計算 <small style="font-size:12px;color:var(--muted)">v1.3.0</small></h1>
+        <h1>賃貸初期費用計算 <small style="font-size:12px;color:var(--muted)">v1.3.1</small></h1>
         <button class="ghost-button document-preview-button" id="previewEstimate" type="button">概算書プレビュー</button>
       </div>
       <div class="total-chip">
@@ -1729,7 +1729,9 @@
       const amountWidth = tableWidth - labelWidth;
       const entry = "#fefcda";
       const totalFill = "#ffff00";
-      const mainY = 486;
+      const otherMonthlyFees = monthlyFeeLines();
+      const monthlyInfoRows = Math.max(2, Math.ceil(otherMonthlyFees.length / 2));
+      const mainY = 486 + (monthlyInfoRows - 2) * 45;
       const headerHeight = 55;
       const totalRowHeight = 45;
       const contentRows = Math.max(14, rows.length);
@@ -1769,14 +1771,24 @@
       drawClassicCell(ctx, tableX + 145, infoY + infoRow, 402, infoRow, byId("rent").value.trim() ? classicCurrency(rent()) : "", { fill: entry, align: "right" });
       drawClassicCell(ctx, tableX + 547, infoY + infoRow, 125, infoRow, "管理費", { align: "center", fontSize: 25 });
       drawClassicCell(ctx, tableX + 672, infoY + infoRow, tableWidth - 672, infoRow, byId("management").value.trim() ? classicCurrency(management()) : "", { fill: entry, align: "right" });
-      drawClassicCell(ctx, tableX, infoY + infoRow * 2, 547, infoRow, rent() ? `月額合計　${classicCurrency(monthly())}` : "", { highlights: [{ x: 145, width: 402 }], fontSize: 22, align: "right" });
-      drawClassicCell(ctx, tableX + 547, infoY + infoRow * 2, tableWidth - 547, infoRow, "");
-      const monthlyBreakdown = monthlyCostLines().map((item) => `${item.name} ${fmt(item.amount)}`).join("　");
-      drawClassicCell(ctx, tableX, infoY + infoRow * 3, tableWidth, infoRow, monthlyFeeLines().length ? monthlyBreakdown : "", { fontSize: 20, minFontSize: 13, highlights: [{ x: 145, width: 205 }, { x: 412, width: 65 }, { x: 547, width: 125 }] });
-      drawClassicCell(ctx, tableX, infoY + infoRow * 4, tableWidth, infoRow, start ? `契約開始予定日　　　 ${start}　から` : "契約開始予定日　　　　 　　　年　　　月　　　日　から", { fontSize: 25, minFontSize: 15, highlights: [{ x: 145, width: 402 }, { x: 547, width: 125 }] });
+      const monthlyInfoY = infoY + infoRow * 2;
+      const monthlyInfoHeight = infoRow * monthlyInfoRows;
+      const monthlyInfoWidth = tableWidth - 145;
+      drawClassicCell(ctx, tableX, monthlyInfoY, 145, monthlyInfoHeight, "その他月額費用", { align: "center", fontSize: 20, minFontSize: 16 });
+      drawClassicCell(ctx, tableX + 145, monthlyInfoY, monthlyInfoWidth, monthlyInfoHeight, "", { fill: entry });
+      ctx.fillStyle = "#050505";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      otherMonthlyFees.forEach((item, index) => {
+        const columnWidth = monthlyInfoWidth / 2;
+        const x = tableX + 145 + index % 2 * columnWidth + 12;
+        const y = monthlyInfoY + Math.floor(index / 2) * infoRow + infoRow / 2;
+        drawFittedText(ctx, `${item.name}　${classicCurrency(item.amount)}/月`, x, y, columnWidth - 24, 23, 17, "normal", "'Meiryo', 'Hiragino Sans', sans-serif");
+      });
+      drawClassicCell(ctx, tableX, monthlyInfoY + monthlyInfoHeight, tableWidth, infoRow, start ? `契約開始予定日　　　 ${start}　から` : "契約開始予定日　　　　 　　　年　　　月　　　日　から", { fontSize: 25, minFontSize: 15, fill: entry });
       ctx.strokeStyle = "#111111";
       ctx.lineWidth = 2.5;
-      ctx.strokeRect(tableX, infoY, tableWidth, infoRow * 5);
+      ctx.strokeRect(tableX, infoY, tableWidth, infoRow * (3 + monthlyInfoRows));
 
       const heading = { align: "center", fontSize: 35, weight: "bold", family: "'Yu Mincho', 'Hiragino Mincho ProN', serif", lineWidth: 1.8 };
       drawClassicCell(ctx, tableX, mainY, labelWidth, headerHeight, "項　目", heading);
@@ -1798,9 +1810,8 @@
         drawClassicAmount(ctx, tableX + labelWidth, y, amountWidth, totalRowHeight, amount, { fontSize: 27, minFontSize: 16, ...options, align: "right" });
         y += totalRowHeight;
       };
-      summary("①　契約金合計（仲介手数料抜き）", totals.grandBeforeDeposit - brokerage, { lineWidth: 1.8 });
-      const brokerageBasis = classicContractBasis(contractDefs.find((def) => def.id === "brokerage"));
-      summary(`②　仲介手数料${brokerageBasis ? `　${brokerageBasis}・税込` : "　税込"}`, brokerage);
+      summary("①　契約金合計", totals.grandBeforeDeposit - brokerage, { lineWidth: 1.8 });
+      summary("②　仲介手数料", brokerage);
       summary("申込金（預り金）", totals.applicationDeposit || null, { fill: entry });
       ctx.textAlign = "right";
       ctx.fillText("▲", tableX + labelWidth - 10, y - totalRowHeight / 2);

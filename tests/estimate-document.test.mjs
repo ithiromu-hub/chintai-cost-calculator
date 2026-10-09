@@ -92,6 +92,21 @@ test("日割賃料・管理費・月次費用の分割で丸め差を生じず�
   }
 });
 
+test("月次保証料などは前賃料・保証料の対象外でも上部の月額費用欄に漏れなく表示する", () => {
+  const c = calculator();
+  const fees = [["月次保証料", 1050], ["口座振替事務手数料", 330], ["町会費", 500], ["火災保険料", 800], ["24時間サポート", 1100], ["駐輪場", 220]];
+  fees.forEach(([name, amount]) => c.monthly(name, amount, false, false));
+  assert.equal(c.run("calculate().grand"), 567081);
+  c.run("makeCanvas()");
+  fees.forEach(([name, amount]) => {
+    const line = c.drawn.find((item) => item.text === `${name}　¥${new Intl.NumberFormat("ja-JP").format(amount)}/月`);
+    assert.ok(line, `${name}を月額費用欄に表示`);
+    assert.ok(line.y >= 316 && line.y < 451);
+  });
+  assert.ok(c.rectangles.some((item) => item.x === 240 && item.y === 316 && item.width === 835 && item.height === 135 && item.fill === "#fefcda"));
+  assert.ok(c.drawn.every((item) => item.y < 1655));
+});
+
 test("フリーレント・翌々月・ペット敷金・任意費用も帳票と計算合計が一致する", () => {
   for (const freeRentTarget of ["rent", "rentManagement"]) {
     const c = calculator({ contractStartDate: "2026-12-22", freeRentValue: "1.5", freeRentTarget, petDepositValue: "1" });
