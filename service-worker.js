@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "chintai-cost-calculator-";
-const CACHE_NAME = `${CACHE_PREFIX}v19`;
+const CACHE_NAME = `${CACHE_PREFIX}v20`;
 const APP_FILES = [
   "./",
   "./index.html",
