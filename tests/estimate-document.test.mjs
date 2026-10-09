@@ -99,7 +99,7 @@ test("月次保証料などは前賃料・保証料の対象外でも上部の�
   assert.equal(c.run("calculate().grand"), 567081);
   c.run("makeCanvas()");
   fees.forEach(([name, amount]) => {
-    const line = c.drawn.find((item) => item.text === `${name}　¥${new Intl.NumberFormat("ja-JP").format(amount)}/月`);
+    const line = c.drawn.find((item) => item.text === `${name}　¥${new Intl.NumberFormat("ja-JP").format(amount)}`);
     assert.ok(line, `${name}を月額費用欄に表示`);
     assert.ok(line.y >= 316 && line.y < 451);
   });

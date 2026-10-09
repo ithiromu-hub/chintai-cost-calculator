@@ -34,7 +34,7 @@ function serviceWorker(fetchResult, cachedResult) {
     self, URL, Response,
     fetch: async () => { if (fetchResult instanceof Error) throw fetchResult; return fetchResult; },
     caches: { open: async () => cache, match: async () => cachedResult,
-      keys: async () => ["chintai-cost-calculator-v18", "chintai-cost-calculator-v19", "chintai-cost-calculator-v20", "chintai-cost-calculator-v21", "other-tool-v1"],
+      keys: async () => ["chintai-cost-calculator-v18", "chintai-cost-calculator-v19", "chintai-cost-calculator-v20", "chintai-cost-calculator-v21", "chintai-cost-calculator-v22", "other-tool-v1"],
       delete: async (key) => deleted.push(key) }
   });
   return { handlers, deleted, writes };
@@ -65,7 +65,7 @@ test("更新時に他アプリのキャッシュは削除しない", async () =>
   let completed;
   worker.handlers.activate({ waitUntil: (promise) => { completed = promise; } });
   await completed;
-  assert.deepEqual(worker.deleted, ["chintai-cost-calculator-v18", "chintai-cost-calculator-v19", "chintai-cost-calculator-v20"]);
+  assert.deepEqual(worker.deleted, ["chintai-cost-calculator-v18", "chintai-cost-calculator-v19", "chintai-cost-calculator-v20", "chintai-cost-calculator-v21"]);
 });
 
 test("別アプリ・別ドメインの通信には介入しない", async () => {

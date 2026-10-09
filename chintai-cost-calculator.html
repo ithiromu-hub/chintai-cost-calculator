@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icon-180.png">
-  <title>賃貸初期費用計算 v1.3.1</title>
+  <title>賃貸初期費用計算 v1.3.2</title>
   <style>
     :root {
       color-scheme: light;
@@ -678,7 +678,7 @@
   <div class="app">
     <header>
       <div>
-        <h1>賃貸初期費用計算 <small style="font-size:12px;color:var(--muted)">v1.3.1</small></h1>
+        <h1>賃貸初期費用計算 <small style="font-size:12px;color:var(--muted)">v1.3.2</small></h1>
         <button class="ghost-button document-preview-button" id="previewEstimate" type="button">概算書プレビュー</button>
       </div>
       <div class="total-chip">
@@ -1783,7 +1783,7 @@
         const columnWidth = monthlyInfoWidth / 2;
         const x = tableX + 145 + index % 2 * columnWidth + 12;
         const y = monthlyInfoY + Math.floor(index / 2) * infoRow + infoRow / 2;
-        drawFittedText(ctx, `${item.name}　${classicCurrency(item.amount)}/月`, x, y, columnWidth - 24, 23, 17, "normal", "'Meiryo', 'Hiragino Sans', sans-serif");
+        drawFittedText(ctx, `${item.name}　${classicCurrency(item.amount)}`, x, y, columnWidth - 24, 23, 17, "normal", "'Meiryo', 'Hiragino Sans', sans-serif");
       });
       drawClassicCell(ctx, tableX, monthlyInfoY + monthlyInfoHeight, tableWidth, infoRow, start ? `契約開始予定日　　　 ${start}　から` : "契約開始予定日　　　　 　　　年　　　月　　　日　から", { fontSize: 25, minFontSize: 15, fill: entry });
       ctx.strokeStyle = "#111111";

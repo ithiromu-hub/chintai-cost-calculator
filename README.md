@@ -1,4 +1,9 @@
-# 賃貸初期費用計算 v1.3.1
+# 賃貸初期費用計算 v1.3.2
+
+## v1.3.2
+
+- 「その他月額費用」欄の各金額から、重複する「/月」表記を削除しました。
+- 更新用リンク: https://ithiromu-hub.github.io/chintai-cost-calculator/chintai-cost-calculator.html?v=1.3.2
 
 ## v1.3.1
 
